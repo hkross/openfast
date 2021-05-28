@@ -26,7 +26,7 @@ The influence of the rotor on inflow velocities is accounted for through the use
 Coordinate Systems
 ------------------
 
-The coorinate systems used in this implementation of DMST theory are illustrated in :numref:`fig:dmst-coords1` and :numref:`fig:dmst-coords2`. Inflow is assumed to be unidirectional, with the free-stream and induced velocities positive as shown. All schematics show a top view, with the positive vertical direction pointing out of the page. The tangential velocity :math:`\omega R` acts along the line tangent to the blade sweep, and the relative velocity is the vector sum of the induced and tangential velocities. The angle of attack is defined from the relative velocity vector to the chord line. The preset pitch angle is defined from the tangent line to the chord line. All angles are defined as positive in the counterclockwise direction, so the preset pitch angle is **negative** as shown, with the leading edge rotated outward. If the preset pitch angle is zero, the tangent and chord lines align. The radius is defined from the axis of rotation to the quarter chord of the blade, which is the reference position for all velocities and forces. The azimuthal blade position is defined as zero when the blade is pointing directly upstream. The inflow angle is the angle between the relative velocity vector and the tangent line. The normal and tangential forces act perpendicular and parallel to the tangent line, respectively. The lift and drag forces act perpendicular and parallel to the relative velocity vector, respectively. All forces are positive as shown.
+The coordinate systems used in this implementation of DMST theory are illustrated in :numref:`fig:dmst-coords1` and :numref:`fig:dmst-coords2`. Inflow is assumed to be unidirectional, with the free-stream and induced velocities positive as shown. All schematics show a top view, with the positive vertical direction pointing out of the page. The tangential velocity :math:`\omega R` acts along the line tangent to the blade sweep, and the relative velocity is the vector sum of the induced and tangential velocities. The angle of attack is defined from the relative velocity vector to the chord line. The preset pitch angle is defined from the tangent line to the chord line. All angles are defined as positive in the counterclockwise direction, so the preset pitch angle is negative as shown, with the leading edge rotated outward. If the preset pitch angle is zero, the tangent and chord lines align. The radius is defined from the axis of rotation to the quarter chord of the blade, which is the reference position for all velocities and forces. The azimuthal blade position is defined as zero when the blade is pointing directly upstream. The inflow angle is the angle between the relative velocity vector and the tangent line. The normal and tangential forces act perpendicular and parallel to the tangent line, respectively. The lift and drag forces act perpendicular and parallel to the relative velocity vector, respectively. All forces are positive as shown.
 
 .. figure:: figures/dmst-coords1.png
    :alt: Coordinate system used for the angles and velocities.
@@ -66,11 +66,19 @@ and the azimuthal position of the streamtube midpoint is calculated as
 
 .. math::
    \begin{aligned}
-   \theta_{st} = \frac{\Delta \theta}{2} + \Delta \theta~(i-1),
+   \theta_{st} = \frac{\Delta \theta}{2} + \Delta \theta~(i-1)
    \end{aligned}
    :label: eq:dmst-thetast
 
-where :math:`i=1:2N_{st}`. For each vertical section, the induced velocities in each streamtube are represented as functions of the upstream and downstream induction factors. The upstream induced velocity is given as
+for the upstream sweep and 
+
+.. math::
+   \begin{aligned}
+   \theta_{st}^\prime = \theta_{st} + \pi
+   \end{aligned}
+   :label: eq:dmst-thetastprime
+
+for the downstream sweep, where :math:`i=1:N_{st}`. For each vertical section, the induced velocities in each streamtube are represented as functions of the upstream and downstream induction factors. The upstream induced velocity is given as
 
 .. math::
    \begin{aligned}
@@ -115,7 +123,7 @@ Similarly, the downstream relative velocity is given as
 
 .. math::
    \begin{aligned}
-   V_{rel}^\prime = V^\prime\sqrt{1+2\lambda^\prime \cos \theta_{st} +\lambda^{\prime 2}},
+   V_{rel}^\prime = V^\prime\sqrt{1+2\lambda^\prime \cos \theta_{st}^\prime +\lambda^{\prime 2}},
    \end{aligned}
    :label: eq:dmst-Vrelprime
 
@@ -139,7 +147,7 @@ and the angle of attack for the downstream sweep as
 
 .. math::
    \begin{aligned}
-   \alpha^\prime = \arctan {\bigg(\frac{\sin \theta_{st}}{\lambda^\prime + \cos \theta_{st}}\bigg)}+\alpha_p.
+   \alpha^\prime = \arctan {\bigg(\frac{\sin \theta_{st}^\prime}{\lambda^\prime + \cos \theta_{st}^\prime}\bigg)}+\alpha_p.
    \end{aligned}
    :label: eq:dmst-alphaprime
 
@@ -221,7 +229,7 @@ for the upstream sweep and
 
 .. math::
    \begin{aligned}
-   \overline{C^\prime_{T,1}}_i = \frac{Nc}{\pi R \Delta \theta \sin \theta_{st} V_e ^2}\int\limits_{\theta_{st}-\frac{\Delta \theta}{2}}^{\theta_{st}+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} [C_t^\prime \cos \theta + C_n^\prime \sin \theta]~\mathrm{d}\theta
+   \overline{C^\prime_{T,1}}_i = \frac{Nc}{\pi R \Delta \theta \sin \theta_{st}^\prime V_e ^2}\int\limits_{\theta_{st}^\prime-\frac{\Delta \theta}{2}}^{\theta_{st}^\prime+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} [C_t^\prime \cos \theta + C_n^\prime \sin \theta]~\mathrm{d}\theta
    \end{aligned}
    :label: eq:dmst-betCTprime
 
@@ -237,7 +245,7 @@ for the upstream sweep and
 
 .. math::
    \begin{aligned}
-   \overline{C^\prime_{T,1}}_i = \frac{NcV_{rel}^{\prime 2}}{\pi R \sin \theta_{st} V_e ^2} (C_t^\prime \cos \theta_{st} + C_n^\prime \sin \theta_{st})
+   \overline{C^\prime_{T,1}}_i = \frac{NcV_{rel}^{\prime 2}}{\pi R \sin \theta_{st}^\prime V_e ^2} (C_t^\prime \cos \theta_{st}^\prime + C_n^\prime \sin \theta_{st}^\prime)
    \end{aligned}
    :label: eq:dmst-betCTprimenoint
 
@@ -269,7 +277,7 @@ and the average power coefficient for the downstream sweep is given as
 
 .. math::
    \begin{aligned}
-   \overline{C_P^\prime}_i = \frac{Nc\omega}{\pi \Delta \theta \sin \theta_{st} V_e ^3}\int\limits_{\theta_{st}-\frac{\Delta \theta}{2}}^{\theta_{st}+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} C_t^\prime~\mathrm{d}\theta.
+   \overline{C_P^\prime}_i = \frac{Nc\omega}{\pi \Delta \theta \sin \theta_{st}^\prime V_e ^3}\int\limits_{\theta_{st}^\prime-\frac{\Delta \theta}{2}}^{\theta_{st}^\prime+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} C_t^\prime~\mathrm{d}\theta.
    \end{aligned}
    :label: eq:dmst-CPprime
 
@@ -285,7 +293,7 @@ for the upstream sweep and
 
 .. math::
    \begin{aligned}
-   \overline{C_P^\prime}_i = \frac{Nc\omega V_{rel}^{\prime 2} C_t^\prime}{\pi \sin \theta_{st} V_e ^3}
+   \overline{C_P^\prime}_i = \frac{Nc\omega V_{rel}^{\prime 2} C_t^\prime}{\pi \sin \theta_{st}^\prime V_e ^3}
    \end{aligned}
    :label: eq:dmst-CPnointprime
 
@@ -301,7 +309,7 @@ and the average torque coefficient for the downstream sweep is given as
 
 .. math::
    \begin{aligned}
-   \overline{C_Q^\prime}_i = \frac{Nc}{\pi R \Delta \theta \sin \theta_{st} V_e ^2}\int\limits_{\theta_{st}-\frac{\Delta \theta}{2}}^{\theta_{st}+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} C_t^\prime~\mathrm{d}\theta.
+   \overline{C_Q^\prime}_i = \frac{Nc}{\pi R \Delta \theta \sin \theta_{st}^\prime V_e ^2}\int\limits_{\theta_{st}^\prime-\frac{\Delta \theta}{2}}^{\theta_{st}^\prime+\frac{\Delta \theta}{2}} V_{rel}^{\prime 2} C_t^\prime~\mathrm{d}\theta.
    \end{aligned}
    :label: eq:dmst-CQprime
 
@@ -317,7 +325,7 @@ for the upstream sweep and
 
 .. math::
    \begin{aligned}
-   \overline{C_Q^\prime}_i = \frac{NcV_{rel}^{\prime 2} C_t^\prime}{\pi R \sin \theta_{st} V_e ^2}
+   \overline{C_Q^\prime}_i = \frac{NcV_{rel}^{\prime 2} C_t^\prime}{\pi R \sin \theta_{st}^\prime V_e ^2}
    \end{aligned}
    :label: eq:dmst-CQnointprime
 
