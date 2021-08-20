@@ -22,6 +22,7 @@ param    ^              -  IntKi    WakeMod_none            -  0  -  "Wake model
 param    ^              -  IntKi    WakeMod_BEMT            -  1  -  "Wake model - BEMT (blade elememnt momentum theory)"     -
 param    ^              -  IntKi    WakeMod_DBEMT           -  2  -  "Wake model - DBEMT (dynamic elememnt momentum theory)"  -
 param    ^              -  IntKi    WakeMod_FVW             -  3  -  "Wake model - FVW (free vortex wake, OLAF)"              -
+param    ^              -  IntKi    WakeMod_DMST            -  4  -  "Wake model - DMST (double multiple streamtube theory)"  -
 
 param    ^              -  IntKi    AFAeroMod_steady        -  1  -  "steady model"                               -
 param    ^              -  IntKi    AFAeroMod_BL_unsteady   -  2  -  "Beddoes-Leishman unsteady model"            -
@@ -147,6 +148,8 @@ typedef	^	AD_InputFile	IntKi	NumOuts	-	-	-	"Number of parameters in the output l
 typedef	^	AD_InputFile	CHARACTER(ChanLen)	OutList	{:}	-	-	"List of user-requested output channels"	-
 typedef	^	AD_InputFile	ReKi	tau1_const	-	-	-	"time constant for DBEMT [used only when WakeMod=2 and DBEMT_Mod/=2]"	s
 typedef	^	AD_InputFile	IntKi	DBEMT_Mod	-	-	-	"Type of dynamic BEMT (DBEMT) model {1=constant tau1, 2=time-dependent tau1}"	-
+typedef	^	AD_InputFile	IntKi	Nst      	-	-	-	"Number of streamtubes [used only when WakeMod=4]"	-
+typedef	^	AD_InputFile	ReKi	DMSTRes	    -	-	-	"Resolution of induction factor initial guess array [used only when WakeMod=4]"	-
 typedef	^	AD_InputFile	IntKi	BldNd_NumOuts	-	-	-	"Number of requested output channels per blade node (AD_AllBldNdOuts)"	-
 typedef	^	AD_InputFile	CHARACTER(ChanLen)	BldNd_OutList	{:}	-	-	"List of user-requested output channels (AD_AllBldNdOuts)"	-
 #typedef  ^  AD_InputFile   IntKi BldNd_BlOutNd {:} - - "The blade nodes to actually output (AD_AllBldNdOuts)" -

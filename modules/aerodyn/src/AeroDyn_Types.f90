@@ -44,6 +44,7 @@ IMPLICIT NONE
     INTEGER(IntKi), PUBLIC, PARAMETER  :: WakeMod_BEMT = 1      ! Wake model - BEMT (blade elememnt momentum theory) [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: WakeMod_DBEMT = 2      ! Wake model - DBEMT (dynamic elememnt momentum theory) [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: WakeMod_FVW = 3      ! Wake model - FVW (free vortex wake, OLAF) [-]
+    INTEGER(IntKi), PUBLIC, PARAMETER  :: WakeMod_DMST = 4      ! Wake model - DMST (double multiple streamtube theory) [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: AFAeroMod_steady = 1      ! steady model [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: AFAeroMod_BL_unsteady = 2      ! Beddoes-Leishman unsteady model [-]
     INTEGER(IntKi), PUBLIC, PARAMETER  :: TwrPotent_none = 0      ! no tower potential flow [-]
@@ -176,6 +177,8 @@ IMPLICIT NONE
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: OutList      !< List of user-requested output channels [-]
     REAL(ReKi)  :: tau1_const      !< time constant for DBEMT [used only when WakeMod=2 and DBEMT_Mod/=2] [s]
     INTEGER(IntKi)  :: DBEMT_Mod      !< Type of dynamic BEMT (DBEMT) model {1=constant tau1, 2=time-dependent tau1} [-]
+    INTEGER(IntKi)  :: Nst      !< Number of streamtubes [used only when WakeMod=4] [-]
+    REAL(ReKi)  :: DMSTRes      !< Resolution of induction factor initial guess array [used only when WakeMod=4] [-]
     INTEGER(IntKi)  :: BldNd_NumOuts      !< Number of requested output channels per blade node (AD_AllBldNdOuts) [-]
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: BldNd_OutList      !< List of user-requested output channels (AD_AllBldNdOuts) [-]
     CHARACTER(1024)  :: BldNd_BlOutNd_Str      !< String to parse for the blade nodes to actually output (AD_AllBldNdOuts) [-]
@@ -3774,6 +3777,8 @@ IF (ALLOCATED(SrcInputFileData%OutList)) THEN
 ENDIF
     DstInputFileData%tau1_const = SrcInputFileData%tau1_const
     DstInputFileData%DBEMT_Mod = SrcInputFileData%DBEMT_Mod
+    DstInputFileData%Nst = SrcInputFileData%Nst
+    DstInputFileData%DMSTRes = SrcInputFileData%DMSTRes
     DstInputFileData%BldNd_NumOuts = SrcInputFileData%BldNd_NumOuts
 IF (ALLOCATED(SrcInputFileData%BldNd_OutList)) THEN
   i1_l = LBOUND(SrcInputFileData%BldNd_OutList,1)
@@ -3931,6 +3936,8 @@ ENDIF
   END IF
       Re_BufSz   = Re_BufSz   + 1  ! tau1_const
       Int_BufSz  = Int_BufSz  + 1  ! DBEMT_Mod
+      Int_BufSz  = Int_BufSz  + 1  ! Nst
+      Re_BufSz   = Re_BufSz   + 1  ! DMSTRes
       Int_BufSz  = Int_BufSz  + 1  ! BldNd_NumOuts
   Int_BufSz   = Int_BufSz   + 1     ! BldNd_OutList allocated yes/no
   IF ( ALLOCATED(InData%BldNd_OutList) ) THEN
@@ -4139,6 +4146,10 @@ ENDIF
     Re_Xferred = Re_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%DBEMT_Mod
     Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%Nst
+    Int_Xferred = Int_Xferred + 1
+    ReKiBuf(Re_Xferred) = InData%DMSTRes
+    Re_Xferred = Re_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%BldNd_NumOuts
     Int_Xferred = Int_Xferred + 1
   IF ( .NOT. ALLOCATED(InData%BldNd_OutList) ) THEN
@@ -4396,6 +4407,10 @@ ENDIF
     Re_Xferred = Re_Xferred + 1
     OutData%DBEMT_Mod = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
+    OutData%Nst = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%DMSTRes = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
     OutData%BldNd_NumOuts = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! BldNd_OutList not allocated

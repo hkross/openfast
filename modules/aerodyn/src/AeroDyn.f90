@@ -2242,9 +2242,9 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
    
    
    if (InputFileData%DTAero <= 0.0)  call SetErrStat ( ErrID_Fatal, 'DTAero must be greater than zero.', ErrStat, ErrMsg, RoutineName )
-   if (InputFileData%WakeMod /= WakeMod_None .and. InputFileData%WakeMod /= WakeMod_BEMT .and. InputFileData%WakeMod /= WakeMod_DBEMT .and. InputFileData%WakeMod /= WakeMod_FVW) then
+   if (InputFileData%WakeMod /= WakeMod_None .and. InputFileData%WakeMod /= WakeMod_BEMT .and. InputFileData%WakeMod /= WakeMod_DBEMT .and. InputFileData%WakeMod /= WakeMod_FVW .and. InputFileData%WakeMod /= WakeMod_DMST) then
       call SetErrStat ( ErrID_Fatal, 'WakeMod must be '//trim(num2lstr(WakeMod_None))//' (none), '//trim(num2lstr(WakeMod_BEMT))//' (BEMT), '// &
-         trim(num2lstr(WakeMod_DBEMT))//' (DBEMT), or '//trim(num2lstr(WakeMod_FVW))//' (FVW).',ErrStat, ErrMsg, RoutineName ) 
+         trim(num2lstr(WakeMod_DBEMT))//' (DBEMT), '//trim(num2lstr(WakeMod_FVW))//' (FVW), or '//trim(num2lstr(WakeMod_DMST))//' (DMST).',ErrStat, ErrMsg, RoutineName ) 
    end if
    
    if (InputFileData%AFAeroMod /= AFAeroMod_Steady .and. InputFileData%AFAeroMod /= AFAeroMod_BL_unsteady) then
@@ -2291,7 +2291,7 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
    
       ! BEMT/DBEMT inputs
       ! bjj: these checks should probably go into BEMT where they are used...
-   if (InputFileData%WakeMod /= WakeMod_none .and. InputFileData%WakeMod /= WakeMod_FVW) then
+   if (InputFileData%WakeMod /= WakeMod_none .and. InputFileData%WakeMod /= WakeMod_FVW .and. InputFileData%WakeMod /= WakeMod_DMST) then
       if ( InputFileData%MaxIter < 1 ) call SetErrStat( ErrID_Fatal, 'MaxIter must be greater than 0.', ErrStat, ErrMsg, RoutineName )
       
       if ( InputFileData%IndToler < 0.0 .or. EqualRealNos(InputFileData%IndToler, 0.0_ReKi) ) &
@@ -2302,7 +2302,30 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
       
    end if !BEMT/DBEMT checks
    
-   
+      ! DMST inputs
+   if (InputFileData%WakeMod == WakeMod_DMST) then
+      if ( InputFileData%AFAeroMod /= AFAeroMod_Steady ) call SetErrStat( ErrID_Fatal, 'AFAeroMod must be '//trim(num2lstr(AFAeroMod_Steady))//' (steady) with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%TwrPotent /= TwrPotent_none ) call SetErrStat( ErrID_Fatal, 'TwrPotent must be '//trim(num2lstr(TwrPotent_none))//' (none) with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%TwrShadow /= TwrShadow_none ) call SetErrStat( ErrID_Fatal, 'TwrShadow must be '//trim(num2lstr(TwrShadow_none))//' (none) with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%TwrAero ) call SetErrStat( ErrID_Fatal, 'TwrAero must be false with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%CavitCheck ) call SetErrStat( ErrID_Fatal, 'Cannot perform a cavitation check with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%CompAA ) call SetErrStat( ErrID_Fatal, 'Cannot use aeroacoustics module with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%Nst < 5 ) call SetErrStat( ErrID_Fatal, 'Nst cannot be less than 5.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%DMSTRes > 0.1 ) call SetErrStat( ErrID_Fatal, 'DMSTRes cannot be greater than 0.1.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%UseBlCm ) call SetErrStat( ErrID_Fatal, 'Aerodynamic pitching moment cannot be used with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+      if ( InputFileData%NTwOuts > 0 ) call SetErrStat( ErrID_Fatal, 'NTwOuts cannot be greater than zero with DMST model.', ErrStat, ErrMsg, RoutineName )
+
+   end if
+
    if ( InputFileData%CavitCheck .and. InputFileData%AFAeroMod == AFAeroMod_BL_unsteady) then
       call SetErrStat( ErrID_Fatal, 'Cannot use unsteady aerodynamics module with a cavitation check', ErrStat, ErrMsg, RoutineName )
    end if
@@ -2353,6 +2376,36 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
             end if
          end do ! j=nodes
       end do ! k=blades
+
+      ! Perform DMST model checks.
+      if (InputFileData%WakeMod == WakeMod_DMST) then
+         do k=1,NumBl(iR)
+            do j=1,InputFileData%rotors(iR)%BladeProps(k)%NumBlNds
+               if ( InputFileData%rotors(iR)%BladeProps(k)%BlCrvAC(j) /= 0.0_ReKi )  then
+                  call SetErrStat( ErrID_Fatal, 'BlCrvAC for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
+                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
+               endif
+               if ( InputFileData%rotors(iR)%BladeProps(k)%BlSwpAC(j) /= 0.0_ReKi )  then
+                  call SetErrStat( ErrID_Fatal, 'BlSwpAC for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
+                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
+               endif
+               if ( InputFileData%rotors(iR)%BladeProps(k)%BlCrvAng(j) /= 0.0_ReKi )  then
+                  call SetErrStat( ErrID_Fatal, 'BlCrvAng for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
+                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
+               endif
+               if ( InputFileData%rotors(iR)%BladeProps(k)%BlTwist(j) /= 0.0_ReKi )  then
+                  call SetErrStat( ErrID_Fatal, 'BlTwist for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
+                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
+               endif
+            end do ! j=nodes
+            do j=1,InputFileData%rotors(iR)%BladeProps(k)%NumBlNds - 1_IntKi
+               if ( .not. EqualRealNos( InputFileData%rotors(iR)%BladeProps(k)%BlChord(j+1_IntKi), InputFileData%rotors(iR)%BladeProps(k)%BlChord(j) ) ) then
+                  call SetErrStat( ErrID_Fatal, 'BlChord for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j+1_IntKi)) &
+                                   //' must be equal to BlChord for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j))//' for DMST model.', ErrStat, ErrMsg, RoutineName )
+               endif
+            end do ! j=nodes
+         end do ! k=blades
+      end if
    end do ! iR rotor
    
       ! .............................
@@ -2381,6 +2434,15 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
       end do ! iR rotor
             
    end if
+
+      ! Perform DMST model checks.
+   do iR = 1,size(NumBl)
+      if (InputFileData%WakeMod == WakeMod_DMST) then
+         if ( InputFileData%rotors(iR)%NumTwrNds > 0 ) then 
+            call SetErrStat( ErrID_Fatal, 'NumTwrNds cannot be greater than zero with DMST model.', ErrStat, ErrMsg, RoutineName )
+         end if
+      end if
+   end do   
    
       ! .............................
       ! check outputs:

@@ -2077,7 +2077,7 @@ SUBROUTINE ParsePrimaryFileInfo( PriPath, InputFile, RootName, NumBlades, interv
       ! DTAero - Time interval for aerodynamic calculations {or default} (s):
    call ParseVarWDefault ( FileInfo_In, CurLine, "DTAero", InputFileData%DTAero, interval, ErrStat2, ErrMsg2, UnEc )
       if (Failed()) return
-      ! WakeMod - Type of wake/induction model (switch) {0=none, 1=BEMT, 2=DBEMT, 3=OLAF}  [WakeMod cannot be 2 or 3 when linearizing]
+      ! WakeMod - Type of wake/induction model (switch) {0=none, 1=BEMT, 2=DBEMT, 3=OLAF, 4=DMST}  [WakeMod cannot be 2, 3, or 4 when linearizing]
    call ParseVar( FileInfo_In, CurLine, "WakeMod", InputFileData%WakeMod, ErrStat2, ErrMsg2, UnEc )
       if (Failed()) return
       ! AFAeroMod - Type of blade airfoil aerodynamics model (switch) {1=steady model, 2=Beddoes-Leishman unsteady model} [AFAeroMod must be 1 when linearizing]
@@ -2180,6 +2180,16 @@ SUBROUTINE ParsePrimaryFileInfo( PriPath, InputFile, RootName, NumBlades, interv
    call ParseVar( FileInfo_In, CurLine, "OLAFInputFileName", InputFileData%FVWFileName, ErrStat2, ErrMsg2, UnEc )
       if (Failed()) return
       IF ( PathIsRelative( InputFileData%FVWFileName ) ) InputFileData%FVWFileName = TRIM(PriPath)//TRIM(InputFileData%FVWFileName)
+
+   !======  Double Multiple Streamtube Theory Options  ================================================== [used only when WakeMod=4]
+   if ( InputFileData%Echo )   WRITE(UnEc, '(A)') FileInfo_In%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+      ! Nst - Number of streamtubes [used only when WakeMod=4]
+   call ParseVar( FileInfo_In, CurLine, "Nst", InputFileData%Nst, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return
+      ! DMSTRes - Resolution of induction factor initial guess array [used only when WakeMod=4]
+   call ParseVarWDefault( FileInfo_In, CurLine, "DMSTRes", InputFileData%DMSTRes, .01_ReKi, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return
 
    !======  Beddoes-Leishman Unsteady Airfoil Aerodynamics Options  ===================================== [used only when AFAeroMod=2]
    if ( InputFileData%Echo )   WRITE(UnEc, '(A)') FileInfo_In%Lines(CurLine)    ! Write section break to echo
@@ -2543,6 +2553,8 @@ SUBROUTINE AD_PrintSum( InputFileData, p, p_AD, u, y, ErrStat, ErrMsg )
          Msg = 'Dynamic Blade-Element/Momentum Theory'
       case (WakeMod_FVW)
          Msg = 'Free Vortex Wake Theory'
+      case (WakeMod_DMST)
+         Msg = 'Double Multiple Streamtube Theory'
       case (WakeMod_None)
          Msg = 'steady'
       case default      
