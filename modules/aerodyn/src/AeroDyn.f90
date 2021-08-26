@@ -2346,9 +2346,9 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
 
       if ( InputFileData%CompAA ) call SetErrStat( ErrID_Fatal, 'Cannot use aeroacoustics module with DMST model.', ErrStat, ErrMsg, RoutineName )
 
-      if ( InputFileData%Nst < 5 ) call SetErrStat( ErrID_Fatal, 'Nst cannot be less than 5.', ErrStat, ErrMsg, RoutineName )
+      if ( InputFileData%Nst <= 0 ) call SetErrStat( ErrID_Fatal, 'Nst must be greater than 0.', ErrStat, ErrMsg, RoutineName )
 
-      if ( InputFileData%DMSTRes > 0.1 ) call SetErrStat( ErrID_Fatal, 'DMSTRes cannot be greater than 0.1.', ErrStat, ErrMsg, RoutineName )
+      if ( InputFileData%DMSTRes <= 0 .or. InputFileData%DMSTRes > 0.5) call SetErrStat( ErrID_Fatal, 'DMSTRes cannot be less than or equal to 0 or greater than 0.5.', ErrStat, ErrMsg, RoutineName )
 
       if ( InputFileData%UseBlCm ) call SetErrStat( ErrID_Fatal, 'Aerodynamic pitching moment cannot be used with DMST model.', ErrStat, ErrMsg, RoutineName )
 
@@ -2428,12 +2428,6 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
                if ( InputFileData%rotors(iR)%BladeProps(k)%BlTwist(j) /= 0.0_ReKi )  then
                   call SetErrStat( ErrID_Fatal, 'BlTwist for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
                                    //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
-               endif
-            end do ! j=nodes
-            do j=1,InputFileData%rotors(iR)%BladeProps(k)%NumBlNds - 1_IntKi
-               if ( .not. EqualRealNos( InputFileData%rotors(iR)%BladeProps(k)%BlChord(j+1_IntKi), InputFileData%rotors(iR)%BladeProps(k)%BlChord(j) ) ) then
-                  call SetErrStat( ErrID_Fatal, 'BlChord for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j+1_IntKi)) &
-                                   //' must be equal to BlChord for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j))//' for DMST model.', ErrStat, ErrMsg, RoutineName )
                endif
             end do ! j=nodes
          end do ! k=blades
