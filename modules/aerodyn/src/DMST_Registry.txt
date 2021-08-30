@@ -1,0 +1,55 @@
+###################################################################################################################################
+# Registry for DMST in the FAST Modularization Framework
+# This Registry file is used to create MODULE DMST which contains all of the user-defined types needed in DMST.
+# It also contains copy, destroy, pack, and unpack routines associated with each defined data type.
+# See NWTC Programmer's Handbook for further information on the format/contents of this file.
+#
+# Entries are of the form
+# <Keyword>   <ModuleName/ModName>   <TypeName>   <FieldType>   <FieldName>   <Dims>   <IO>   <DName>   <Descrip>   <Units>
+#
+# Use ^ as a shortcut for the value in the same column from the previous line.
+###################################################################################################################################
+#
+# ..... Include files (definitions from NWTC Library) .............................................................................
+include   Registry_NWTC_Library.txt
+#
+# ..... Initialization data .......................................................................................................
+# Define inputs that the initialization routine may need here:
+#
+typedef   DMST/DMST                    InitInputType                 ReKi                     chord                           {:}{:}     -          -          "Chord length at node" m
+typedef   ^                            ^                             INTEGER                  numBlades                       -          -          -          "Number of blades" -
+typedef   ^                            ^                             ReKi                     airDens                         -          -          -          "Air density" kg/m^3
+typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
+typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
+typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m                 
+#
+# Define outputs from the initialization routine here:
+#
+typedef   ^                            InitOutputType                ProgDesc                 Version                         -          -          -          "" -
+#
+# ..... Parameters ................................................................................................................
+# Define parameters here:
+#
+typedef   ^                            ParameterType                 DbKi                     DT                              -          -          -          "Time step" s
+typedef   ^                            ^                             ReKi                     chord                           {:}{:}     -          -          "Chord length at node" m
+typedef   ^                            ^                             INTEGER                  numBlades                       -          -          -          "Number of blades" -
+typedef   ^                            ^                             ReKi                     airDens                         -          -          -          "Air density" kg/m^3
+typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
+typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
+typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m
+typedef   ^                            ^                             ReKi                     dTheta                          {:}        -          -          "Total streamtube angle" rad
+typedef   ^                            ^                             ReKi                     theta_st                        {:}{:}     -          -          "Azimuthal position of streamtube midpoint" rad
+#
+# ..... Inputs ....................................................................................................................
+# Define inputs that are contained on the mesh here:
+#
+typedef   ^                            InputType                     ReKi                     Vinf                            {:}{:}     -          -          "Free-stream velocity" m/s
+typedef   ^                            ^                             ReKi                     pitch                           {:}        -          -          "Blade pitch angle" rad
+#
+# ..... Outputs ...................................................................................................................
+# Define outputs that are contained on the mesh here:
+typedef   ^                            OutputType                    ReKi                     Vind                            {:}{:}     -          -          "Global induced velocity" m/s

@@ -25,6 +25,7 @@ module AeroDyn
    use AeroDyn_Types
    use AeroDyn_IO
    use BEMT
+   use DMST
    use AirfoilInfo
    use NWTC_LAPACK
    use AeroAcoustics
@@ -347,7 +348,7 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
       ! initialize BEMT after setting parameters and inputs because we are going to use the already-
       ! calculated node positions from the input meshes
       
-   if (p%WakeMod /= WakeMod_FVW) then
+   if (p%WakeMod /= WakeMod_FVW .and. p%WakeMod /= WakeMod_DMST) then
       do iR = 1, nRotors
          call Init_BEMTmodule( InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%BEMT_u(1), p%rotors(iR), p, x%rotors(iR)%BEMT, xd%rotors(iR)%BEMT, z%rotors(iR)%BEMT, &
                                  OtherState%rotors(iR)%BEMT, m%rotors(iR)%BEMT_y, m%rotors(iR)%BEMT, ErrStat2, ErrMsg2 )
@@ -364,6 +365,12 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
             call Init_AAmodule( InitInp%rotors(iR), InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%AA_u, p%rotors(iR), p, x%rotors(iR)%AA, xd%rotors(iR)%AA, z%rotors(iR)%AA, OtherState%rotors(iR)%AA, m%rotors(iR)%AA_y, m%rotors(iR)%AA, ErrStat2, ErrMsg2 )
             if (Failed()) return;
          end if   
+      enddo
+
+   elseif (p%WakeMod == WakeMod_DMST) then
+      do iR = 1, nRotors
+         call Init_DMSTmodule( InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%DMST_u, p%rotors(iR), p, m%rotors(iR)%DMST_y, ErrStat2, ErrMsg2 )
+         if (Failed()) return;
       enddo
 
    else ! if (p%WakeMod == WakeMod_FVW) then
@@ -2838,7 +2845,85 @@ contains
    end subroutine Cleanup
    
 END SUBROUTINE Init_BEMTmodule
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This routine initializes the DMST module from within AeroDyn.
+SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y, ErrStat, ErrMsg )
+!..................................................................................................................................
+   type(AD_InputFile),             intent(in   ) :: InputFileData  !< All the data in the AeroDyn input file
+   type(RotInputFile),             intent(in   ) :: RotInputFileData !< Data in AeroDyn input file related to current rotor
+   type(RotInputType),             intent(in   ) :: u_AD           !< AD inputs - used for input mesh node positions
+   type(DMST_InputType),           intent(  out) :: u              !< An initial guess for the input; input mesh must be defined
+   type(RotParameterType),         intent(inout) :: p              !< Parameters ! intent out b/c we set the DMST parameters here
+   type(AD_ParameterType),         intent(inout) :: p_AD           !< Parameters ! intent out b/c we set the DMST parameters here
+   type(DMST_OutputType),          intent(  out) :: y              !< Initial system outputs (outputs are not calculated;
+                                                                   !!   only the output mesh is initialized)
+   integer(IntKi),                 intent(  out) :: ErrStat        !< Error status of the operation
+   character(*),                   intent(  out) :: ErrMsg         !< Error message if ErrStat /= ErrID_None
 
+      ! Local variables
+   real(DbKi)                                    :: Interval       ! Coupling interval in seconds
+   type(DMST_InitInputType)                      :: InitInp        ! Input for initialization routine
+   type(DMST_InitOutputType)                     :: InitOut        ! Output for initialization routine                                           
+   integer(intKi)                                :: j              ! Node index
+   integer(intKi)                                :: k              ! Blade index
+   integer(IntKi)                                :: ErrStat2
+   character(ErrMsgLen)                          :: ErrMsg2
+   character(*), parameter                       :: RoutineName = 'Init_DMSTmodule'
+   
+   ! note here that each blade is required to have the same number of nodes
+   
+   ErrStat = ErrID_None
+   ErrMsg  = ""
+      
+      ! set initialization data here:   
+   Interval                 = p_AD%DT   
+   InitInp%numBlades        = p%NumBlades
+   InitInp%numBladeNodes    = p%NumBlNds 
+   InitInp%airDens          = InputFileData%AirDens 
+   InitInp%kinVisc          = InputFileData%KinVisc     
+   InitInp%Nst              = InputFileData%Nst              
+   
+   call AllocAry(InitInp%chord, InitInp%numBladeNodes,InitInp%numBlades,'chord', ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+   call AllocAry(InitInp%AFindx,InitInp%numBladeNodes,InitInp%numBlades,'AFindx',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+   call AllocAry(InitInp%radius,InitInp%numBladeNodes,'radius',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+      
+   if ( ErrStat >= AbortErrLev ) then
+      call Cleanup()
+      return
+   end if  
+
+   do k=1,p%NumBlades
+      do j=1,p%NumBlNds
+         InitInp%chord (j,k) = RotInputFileData%BladeProps(k)%BlChord(j)
+         InitInp%AFindx(j,k) = RotInputFileData%BladeProps(k)%BlAFID(j)
+      end do
+   end do
+      
+   do j=1,p%NumBlNds
+      InitInp%radius(j) = sqrt( (u_AD%BladeMotion(1)%Position(1,j)-u_AD%HubMotion%Position(1,1))**2 + (u_AD%BladeMotion(1)%Position(2,j)-u_AD%HubMotion%Position(2,1))**2 )
+   end do
+
+   if (ErrStat >= AbortErrLev) then
+      call cleanup()
+      return
+   end if
+      
+   call DMST_Init( InitInp, u, p%DMST, y, Interval, InitOut, ErrStat2, ErrMsg2 )
+      call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )   
+            
+   if ( .not. equalRealNos(Interval, p_AD%DT) ) &
+      call SetErrStat( ErrID_Fatal, "DTAero was changed in Init_DMSTmodule(); this is not allowed.", ErrStat2, ErrMsg2, RoutineName )
+      
+   call Cleanup()
+   return
+      
+contains   
+   subroutine Cleanup()
+      call DMST_DestroyInitInput( InitInp, ErrStat2, ErrMsg2 )   
+      call DMST_DestroyInitOutput( InitOut, ErrStat2, ErrMsg2 )   
+   end subroutine Cleanup
+      
+END SUBROUTINE Init_DMSTmodule
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes the FVW module from within AeroDyn.
 SUBROUTINE Init_OLAF( InputFileData, u_AD, u, p, x, xd, z, OtherState, m, ErrStat, ErrMsg )

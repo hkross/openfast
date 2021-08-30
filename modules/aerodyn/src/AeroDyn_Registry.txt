@@ -13,7 +13,8 @@
 include	Registry_NWTC_Library.txt
 usefrom	AirfoilInfo_Registry.txt
 usefrom	BEMT_Registry.txt
-usefrom  FVW_Registry.txt
+usefrom	DMST_Registry.txt
+usefrom FVW_Registry.txt
 usefrom	UnsteadyAero_Registry.txt
 usefrom AeroAcoustics_Registry.txt
 
@@ -195,6 +196,8 @@ typedef	^	OtherStateType	ReKi	WakeLocationPoints	{:}{:}	-	-	"wake points velocit
 typedef	^	RotMiscVarType	BEMT_MiscVarType	BEMT	-	-	-	"MiscVars from the BEMT module"	-
 typedef	^	RotMiscVarType	BEMT_OutputType	BEMT_y	-	-	-	"Outputs from the BEMT module"	-
 typedef	^	RotMiscVarType	BEMT_InputType	BEMT_u	2	-	-	"Inputs to the BEMT module"	-
+typedef	^	RotMiscVarType	DMST_OutputType	DMST_y	-	-	-	"Outputs from the DMST module"	-
+typedef	^	RotMiscVarType	DMST_InputType	DMST_u	-	-	-	"Inputs to the DMST module"	-
 typedef	^	RotMiscVarType	AA_MiscVarType	AA	-	-	-	"MiscVars from the AA module"	-
 typedef	^	RotMiscVarType	AA_OutputType	AA_y	-	-	-	"Outputs from the AA module"	-
 typedef	^	RotMiscVarType	AA_InputType	AA_u	-	-	-	"Inputs to the AA module"	-
@@ -236,6 +239,7 @@ typedef	^	RotParameterType	ReKi	TwrDiam	{:}	-	-	"Diameter of tower at node"	m
 typedef	^	RotParameterType	ReKi	TwrCd	{:}	-	-	"Coefficient of drag at tower node"	-
 typedef	^	RotParameterType	ReKi	TwrTI	{:}	-	-	"Turbulence intensity for tower shadow at tower node"	-
 typedef	^	RotParameterType	BEMT_ParameterType	BEMT	-	-	-	"Parameters for BEMT module"
+typedef	^	RotParameterType	DMST_ParameterType	DMST	-	-	-	"Parameters for DMST module"
 typedef	^	RotParameterType	AA_ParameterType	AA	-	-	-	"Parameters for AA module"
 typedef	^	RotParameterType	Integer	Jac_u_indx	{:}{:}	-	-	"matrix to help fill/pack the u vector in computing the jacobian"	-
 typedef	^	RotParameterType	ReKi	du	{:}	-	-	"vector that determines size of perturbation for u (inputs)"

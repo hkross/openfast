@@ -23,6 +23,7 @@ if (GENERATE_TYPES)
   generate_f90_types(src/UnsteadyAero_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/UnsteadyAero_Types.f90)
   generate_f90_types(src/AeroDyn_Driver_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/AeroDyn_Driver_Types.f90 -noextrap)
   generate_f90_types(src/FVW_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/FVW_Types.f90)
+  generate_f90_types(src/DMST_Registry.txt ${CMAKE_CURRENT_LIST_DIR}/src/DMST_Types.f90)
 endif()
 
 
@@ -42,10 +43,12 @@ set(AD_LIBS_SOURCES
   src/BEMT.f90
   src/DBEMT.f90
   src/BEMTUncoupled.f90
+  src/DMST.f90
   src/mod_root1dim.f90
   src/AeroDyn_Types.f90
   src/BEMT_Types.f90
   src/DBEMT_Types.f90
+  src/DMST_Types.f90
 )
 
 # UnsteadyAero lib
