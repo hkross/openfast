@@ -67,6 +67,7 @@ IMPLICIT NONE
 ! =======================
 ! =========  DMST_InputType  =======
   TYPE, PUBLIC :: DMST_InputType
+    REAL(ReKi)  :: omega      !< Rotor angular velocity [rad/s]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Vinf      !< Free-stream velocity [m/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: pitch      !< Blade pitch angle [rad]
   END TYPE DMST_InputType
@@ -1098,6 +1099,7 @@ ENDIF
 ! 
    ErrStat = ErrID_None
    ErrMsg  = ""
+    DstInputData%omega = SrcInputData%omega
 IF (ALLOCATED(SrcInputData%Vinf)) THEN
   i1_l = LBOUND(SrcInputData%Vinf,1)
   i1_u = UBOUND(SrcInputData%Vinf,1)
@@ -1178,6 +1180,7 @@ ENDIF
   Re_BufSz  = 0
   Db_BufSz  = 0
   Int_BufSz  = 0
+      Re_BufSz   = Re_BufSz   + 1  ! omega
   Int_BufSz   = Int_BufSz   + 1     ! Vinf allocated yes/no
   IF ( ALLOCATED(InData%Vinf) ) THEN
     Int_BufSz   = Int_BufSz   + 2*2  ! Vinf upper/lower bounds for each dimension
@@ -1215,6 +1218,8 @@ ENDIF
   Db_Xferred  = 1
   Int_Xferred = 1
 
+    ReKiBuf(Re_Xferred) = InData%omega
+    Re_Xferred = Re_Xferred + 1
   IF ( .NOT. ALLOCATED(InData%Vinf) ) THEN
     IntKiBuf( Int_Xferred ) = 0
     Int_Xferred = Int_Xferred + 1
@@ -1280,6 +1285,8 @@ ENDIF
   Re_Xferred  = 1
   Db_Xferred  = 1
   Int_Xferred  = 1
+    OutData%omega = ReKiBuf(Re_Xferred)
+    Re_Xferred = Re_Xferred + 1
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! Vinf not allocated
     Int_Xferred = Int_Xferred + 1
   ELSE
@@ -1608,6 +1615,8 @@ ENDIF
    END IF
 
    ScaleFactor = t_out / t(2)
+  b = -(u1%omega - u2%omega)
+  u_out%omega = u1%omega + b * ScaleFactor
 IF (ALLOCATED(u_out%Vinf) .AND. ALLOCATED(u1%Vinf)) THEN
   DO i2 = LBOUND(u_out%Vinf,2),UBOUND(u_out%Vinf,2)
     DO i1 = LBOUND(u_out%Vinf,1),UBOUND(u_out%Vinf,1)
@@ -1681,6 +1690,9 @@ END IF ! check if allocated
    END IF
 
    ScaleFactor = t_out / (t(2) * t(3) * (t(2) - t(3)))
+  b = (t(3)**2*(u1%omega - u2%omega) + t(2)**2*(-u1%omega + u3%omega))* scaleFactor
+  c = ( (t(2)-t(3))*u1%omega + t(3)*u2%omega - t(2)*u3%omega ) * scaleFactor
+  u_out%omega = u1%omega + b  + c * t_out
 IF (ALLOCATED(u_out%Vinf) .AND. ALLOCATED(u1%Vinf)) THEN
   DO i2 = LBOUND(u_out%Vinf,2),UBOUND(u_out%Vinf,2)
     DO i1 = LBOUND(u_out%Vinf,1),UBOUND(u_out%Vinf,1)

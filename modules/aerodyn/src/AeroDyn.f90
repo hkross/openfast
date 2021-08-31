@@ -519,7 +519,7 @@ subroutine AD_ReInit(p,x, xd, z, OtherState, m, Interval, ErrStat, ErrMsg )
       ! and the UA filter
    end if
       
-   if (p%WakeMod /= WakeMod_FVW) then
+   if (p%WakeMod /= WakeMod_FVW .and. p%WakeMod /= WakeMod_DMST) then
       do IR=1, size(p%rotors)
          call BEMT_ReInit(p%rotors(iR)%BEMT,x%rotors(iR)%BEMT,xd%rotors(iR)%BEMT,z%rotors(iR)%BEMT,OtherState%rotors(iR)%BEMT,m%rotors(iR)%BEMT,ErrStat,ErrMsg)
 
@@ -1282,7 +1282,7 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
    enddo
          
 
-   if (p%WakeMod /= WakeMod_FVW) then
+   if (p%WakeMod /= WakeMod_FVW .and. p%WakeMod /= WakeMod_DMST) then
       do iR = 1,size(p%rotors)
             ! Call into the BEMT update states    NOTE:  This is a non-standard framework interface!!!!!  GJH
             ! Also note BEMT_u(1) and BEMT_u(2) are not following the OpenFAST convention for t+dt, t
@@ -1457,7 +1457,7 @@ subroutine RotCalcOutput( t, u, p, p_AD, x, xd, z, OtherState, y, m, ErrStat, Er
    call SetInputs(p, p_AD, u, m, indx, errStat2, errMsg2)      
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 
-   if (p_AD%WakeMod /= WakeMod_FVW) then
+   if (p_AD%WakeMod /= WakeMod_FVW .and. p_AD%WakeMod /= WakeMod_DMST) then
       ! Call the BEMT module CalcOutput.  Notice that the BEMT outputs are purposely attached to AeroDyn's MiscVar structure to
       ! avoid issues with the coupling code
 
@@ -1477,6 +1477,13 @@ subroutine RotCalcOutput( t, u, p, p_AD, x, xd, z, OtherState, y, m, ErrStat, Er
 
       call AD_CavtCrit(u, p, m, errStat2, errMsg2)
       call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)      
+   
+   elseif (p_AD%WakeMod == WakeMod_DMST) then
+      ! Call the DMST module CalcOutput.  Notice that the DMST outputs are purposely attached to AeroDyn's MiscVar structure to
+      ! avoid issues with the coupling code
+!      call DMST_CalcOutput(t, m%BEMT_u(indx), p%BEMT, x%BEMT, xd%BEMT, z%BEMT, OtherState%BEMT, p_AD%AFI, m%BEMT_y, m%BEMT, ErrStat2, ErrMsg2 )
+!         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+!      call SetOutputsFromFVW( p, m, y )
    endif
 
    if ( p%TwrAero ) then
@@ -1665,11 +1672,16 @@ subroutine SetInputs(p, p_AD, u, m, indx, errStat, errMsg)
    ! Disturbed inflow on blade (if tower shadow present)
    call SetDisturbedInflow(p, u, m, errStat, errMsg)
 
-   if (p_AD%WakeMod /= WakeMod_FVW) then
+   if (p_AD%WakeMod /= WakeMod_FVW .and. p_AD%WakeMod /= WakeMod_DMST) then
          ! This needs to extract the inputs from the AD data types (mesh) and massage them for the BEMT module
       call SetInputsForBEMT(p, u, m, indx, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   elseif (p_AD%WakeMod == WakeMod_DMST) then
+         ! This needs to extract the inputs from the AD data types (mesh) and massage them for the DMST module
+      call SetInputsForDMST(p, u, m, errStat2, errMsg2)
+         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    endif
+
 end subroutine SetInputs
 
 !> Disturbed inflow on the blade if tower shadow or tower influence are enabled
@@ -1944,6 +1956,48 @@ subroutine GeomWithoutSweepPitchTwist(p,u,m,thetaBladeNds,ErrStat,ErrMsg)
       ErrMsg ='GeomWithoutSweepPitchTwist: AeroProjMod not supported '//trim(num2lstr(p%AeroProjMod))
    endif
 end subroutine GeomWithoutSweepPitchTwist
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This subroutine sets m%DMST_u.
+subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
+
+   type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
+   type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
+   type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
+   integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
+   character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
+      
+   ! local variables
+   real(R8Ki)                              :: x_hat_disk(3)
+   real(R8Ki)                              :: y_hat_disk(3)
+   real(R8Ki)                              :: z_hat_disk(3)
+   real(R8Ki)                              :: thetaBladeNds(p%NumBlNds,p%NumBlades)
+   real(R8Ki)                              :: Azimuth(p%NumBlades)
+   real(R8Ki)                              :: tmp1(3)
+   real(R8Ki)                              :: tmp2(3)
+   integer(intKi)                          :: j                               ! Loop counter for nodes
+   character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
+   
+   ! note ErrStat and ErrMsg are set in GeomWithoutSweepPitchTwist
+
+      ! Get disk average values and orientations
+   call DiskAvgValues( p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth )
+   call GeomWithoutSweepPitchTwist( p, u, m, thetaBladeNds, ErrStat, ErrMsg )
+   if (ErrStat >= AbortErrLev) return
+      
+      ! Free-stream velocity, m/s
+   m%DMST_u%Vinf = u%InflowOnBlade(:,:,1)
+
+      ! Rotor angular velocity, rad/s
+   m%DMST_u%omega = dot_product( u%HubMotion%Orientation(1,1:3,1), u%HubMotion%RotationVel(:,1) )
+   
+      ! Blade pitch angle, rad
+   tmp1 = EulerExtract( matmul(u%BladeRootMotion(1)%RefOrientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
+   do j=1,p%NumBlNds      
+      tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
+      m%DMST_u%pitch(j) = tmp2(1) - tmp1(1)
+   end do !j=nodes
+   
+end subroutine SetInputsForDMST
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%FVW_u(indx).
 subroutine SetInputsForFVW(p, u, m, errStat, errMsg)

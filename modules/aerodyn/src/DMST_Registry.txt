@@ -47,7 +47,8 @@ typedef   ^                            ^                             ReKi       
 # ..... Inputs ....................................................................................................................
 # Define inputs that are contained on the mesh here:
 #
-typedef   ^                            InputType                     ReKi                     Vinf                            {:}{:}     -          -          "Free-stream velocity" m/s
+typedef   ^                            InputType                     ReKi                     omega                           -          -          -          "Rotor angular velocity" rad/s
+typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}     -          -          "Free-stream velocity" m/s
 typedef   ^                            ^                             ReKi                     pitch                           {:}        -          -          "Blade pitch angle" rad
 #
 # ..... Outputs ...................................................................................................................
