@@ -367,6 +367,10 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
          end if   
       enddo
 
+      !............................................................................................
+      ! Initialize the DMST module
+      !............................................................................................
+
    elseif (p%WakeMod == WakeMod_DMST) then
       do iR = 1, nRotors
          call Init_DMSTmodule( InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%DMST_u, p%rotors(iR), p, m%rotors(iR)%DMST_y, ErrStat2, ErrMsg2 )
@@ -1481,8 +1485,8 @@ subroutine RotCalcOutput( t, u, p, p_AD, x, xd, z, OtherState, y, m, ErrStat, Er
    elseif (p_AD%WakeMod == WakeMod_DMST) then
       ! Call the DMST module CalcOutput.  Notice that the DMST outputs are purposely attached to AeroDyn's MiscVar structure to
       ! avoid issues with the coupling code
-!      call DMST_CalcOutput(t, m%BEMT_u(indx), p%BEMT, x%BEMT, xd%BEMT, z%BEMT, OtherState%BEMT, p_AD%AFI, m%BEMT_y, m%BEMT, ErrStat2, ErrMsg2 )
-!         call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      call DMST_CalcOutput( m%DMST_u, p%DMST, p_AD%AFI, m%DMST_y, ErrStat2, ErrMsg2 )
+         call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
 !      call SetOutputsFromFVW( p, m, y )
    endif
 
@@ -1974,6 +1978,7 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    real(R8Ki)                              :: Azimuth(p%NumBlades)
    real(R8Ki)                              :: tmp1(3)
    real(R8Ki)                              :: tmp2(3)
+   integer(intKi)                          :: i                               ! Loop counter for streamtubes
    integer(intKi)                          :: j                               ! Loop counter for nodes
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
    
@@ -1985,7 +1990,11 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    if (ErrStat >= AbortErrLev) return
       
       ! Free-stream velocity, m/s
-   m%DMST_u%Vinf = u%InflowOnBlade(:,:,1)
+   do j = 1,p%NumBlNds
+      do i = 1,p%DMST%Nst
+         m%DMST_u%Vinf(:,i,j) = u%InflowOnBlade(:,j,1)
+      end do
+   end do
 
       ! Rotor angular velocity, rad/s
    m%DMST_u%omega = dot_product( u%HubMotion%Orientation(1,1:3,1), u%HubMotion%RotationVel(:,1) )
@@ -1996,6 +2005,8 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
       tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
       m%DMST_u%pitch(j) = tmp2(1) - tmp1(1)
    end do !j=nodes
+
+   m%DMST_u%UserProp = u%UserProp
    
 end subroutine SetInputsForDMST
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -2935,7 +2946,8 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
    InitInp%numBladeNodes    = p%NumBlNds 
    InitInp%airDens          = InputFileData%AirDens 
    InitInp%kinVisc          = InputFileData%KinVisc     
-   InitInp%Nst              = InputFileData%Nst              
+   InitInp%Nst              = InputFileData%Nst
+   InitInp%DMSTRes          = InputFileData%DMSTRes
    
    call AllocAry(InitInp%chord, InitInp%numBladeNodes,InitInp%numBlades,'chord', ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
    call AllocAry(InitInp%AFindx,InitInp%numBladeNodes,InitInp%numBlades,'AFindx',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)

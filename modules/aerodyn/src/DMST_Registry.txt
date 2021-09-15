@@ -12,6 +12,7 @@
 #
 # ..... Include files (definitions from NWTC Library) .............................................................................
 include   Registry_NWTC_Library.txt
+usefrom   AirfoilInfo_Registry.txt
 #
 # ..... Initialization data .......................................................................................................
 # Define inputs that the initialization routine may need here:
@@ -23,6 +24,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
 typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
 typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m                 
 #
 # Define outputs from the initialization routine here:
@@ -40,16 +42,19 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
 typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
 typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m
 typedef   ^                            ^                             ReKi                     dTheta                          {:}        -          -          "Total streamtube angle" rad
 typedef   ^                            ^                             ReKi                     theta_st                        {:}{:}     -          -          "Azimuthal position of streamtube midpoint" rad
+typedef   ^                            ^                             ReKi                     indf                            {:}        -          -          "Induction factor initial guess array" -
 #
 # ..... Inputs ....................................................................................................................
 # Define inputs that are contained on the mesh here:
 #
 typedef   ^                            InputType                     ReKi                     omega                           -          -          -          "Rotor angular velocity" rad/s
-typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}     -          -          "Free-stream velocity" m/s
+typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}{:}  -          -          "Free-stream velocity" m/s
 typedef   ^                            ^                             ReKi                     pitch                           {:}        -          -          "Blade pitch angle" rad
+typedef   ^                            ^                             ReKi                     UserProp                        {:}{:}     -          -          "Optional user property for interpolating airfoils (per element per blade)" -
 #
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
