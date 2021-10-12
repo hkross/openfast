@@ -90,7 +90,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   allocate ( p%theta_st(p%numBladeNodes, 2_IntKi*p%Nst), STAT = errStat2 )
+   allocate ( p%theta_st(2_IntKi*p%Nst, p%numBladeNodes), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%theta_st.', errStat, errMsg, RoutineName )
       return
@@ -111,10 +111,10 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
    do i=1,p%numBladeNodes
       p%dTheta(i) = pi/p%Nst
       do j=1,p%Nst
-         p%theta_st(i,j) = p%dTheta(i)/2.0_ReKi + p%dTheta(i)*(j-1)
+         p%theta_st(j,i) = p%dTheta(i)/2.0_ReKi + p%dTheta(i)*(j-1)
       end do
       do j=p%Nst+1,p%Nst*2
-         p%theta_st(i,j) = p%theta_st(i,j-p%Nst) + pi
+         p%theta_st(j,i) = p%theta_st(j-p%Nst,i) + pi
       end do
       do j = 1,lgth
          p%indf(j) = 0.0_ReKi + p%DMSTRes*(j - 1)
@@ -153,6 +153,13 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
    end if 
    u%pitch = 0.0_ReKi
 
+   allocate ( u%blade_st(p%numBladeNodes,p%numBlades), STAT = errStat2 )
+   if ( errStat2 /= 0 ) then
+      call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%blade_st.', errStat, errMsg, RoutineName )
+      return
+   end if 
+   u%blade_st = 0.0_ReKi
+
    allocate ( u%UserProp(p%numBladeNodes, p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%UserProp.', errStat, errMsg, RoutineName )
@@ -181,7 +188,7 @@ subroutine DMST_AllocOutput( y, p, errStat, errMsg )
    errStat = ErrID_None
    errMsg  = ""
 
-   call allocAry( y%Vind, p%numBladeNodes, p%numBlades, 'y%Vind', errStat2, errMsg2 ); call setErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+   call allocAry( y%Vind, 3_IntKi, p%numBladeNodes, p%numBlades, 'y%Vind', errStat2, errMsg2 ); call setErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
 
    y%Vind = 0.0_ReKi
 
@@ -469,14 +476,14 @@ subroutine calculate_CTbe( Vinf, indf, p, u, AFinfo, CTbe )
          do i = 1,size(p%indf)
             V(i,j,k) = p%indf(i)*Vinf(1,j,k) ! free-stream minus induced velocity
             lambda(i,j,k) = u%omega*p%radius(k)/V(i,j,k) ! local tip-speed ratio
-            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0*lambda(i,j,k)*cos(p%theta_st(k,j)) + lambda(i,j,k)**2) ! relative velocity
+            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0*lambda(i,j,k)*cos(p%theta_st(j,k)) + lambda(i,j,k)**2) ! relative velocity
             Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
-            alpha(i,j,k) = atan2(sin(p%theta_st(k,j)),lambda(i,j,k) + cos(p%theta_st(k,j))) + u%pitch(k) ! angle of attack
+            alpha(i,j,k) = atan2(sin(p%theta_st(j,k)),lambda(i,j,k) + cos(p%theta_st(j,k))) + u%pitch(k) ! angle of attack
             call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
             phi(i,j,k) = alpha(i,j,k) - u%pitch(k) ! inflow angle
             Cn(i,j,k) = AFI_interp%Cd*sin(phi(i,j,k)) + AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
-            CTbe(i,j,k) = p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(k,j))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(k,j)) + Cn(i,j,k)*sin(p%theta_st(k,j))) ! thrust coefficient from blade element theory
+            CTbe(i,j,k) = p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(j,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(j,k)) + Cn(i,j,k)*sin(p%theta_st(j,k))) ! thrust coefficient from blade element theory
          end do
       end do
    end do
@@ -623,6 +630,7 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
    integer(IntKi)                                                          :: j              ! Loops through streamtubes
    integer(IntKi)                                                          :: k              ! Loops through nodes
    integer(IntKi)                                                          :: m              ! Loops through sweeps
+   integer(IntKi)                                                          :: n              ! Loops through blades   
    character(*), parameter                                                 :: RoutineName = 'DMST_CalcOutput'
 
       ! Initialize some output values
@@ -724,6 +732,13 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
       end do
       do j = p%Nst+1,p%Nst*2
          Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(j-p%Nst,k) + 1.0_ReKi)*u%Vinf(1,j-p%Nst,k)
+      end do
+   end do
+
+   ! Output induced velocity values at blade nodes
+   do n = 1,p%numBlades
+      do k = 1,p%numBladeNodes
+         y%Vind(:,k,n) = Vind_st(:,u%blade_st(k,n),k)
       end do
    end do
 

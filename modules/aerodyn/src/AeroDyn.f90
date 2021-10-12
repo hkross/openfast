@@ -1978,8 +1978,12 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    real(R8Ki)                              :: Azimuth(p%NumBlades)
    real(R8Ki)                              :: tmp1(3)
    real(R8Ki)                              :: tmp2(3)
-   integer(intKi)                          :: i                               ! Loop counter for streamtubes
-   integer(intKi)                          :: j                               ! Loop counter for nodes
+   real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
+   real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
+   real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
+   integer(intKi)                          :: i                                            ! Loop counter for streamtubes
+   integer(intKi)                          :: j                                            ! Loop counter for nodes
+   integer(intKi)                          :: k                                            ! Loop counter for blades
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
    
    ! note ErrStat and ErrMsg are set in GeomWithoutSweepPitchTwist
@@ -2004,7 +2008,33 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    do j=1,p%NumBlNds      
       tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
       m%DMST_u%pitch(j) = tmp2(1) - tmp1(1)
-   end do !j=nodes
+   end do
+
+   ! Azimuthal location of each blade, rad
+   theta_b_tmp = EulerExtract( matmul(u%HubMotion%Orientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
+   theta_b(1) = theta_b_tmp(1)
+   do k = 2,p%numBlades
+      theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%numBlades*(k-1)
+   end do
+
+   ! Range of azimuth angles within each streamtube
+   do j = 1,p%NumBlNds
+      do i = 1,2*p%DMST%Nst
+         theta_st_r(1,i,j) = p%DMST%theta_st(i,j) - p%DMST%dTheta(j)/2.0_ReKi
+         theta_st_r(2,i,j) = p%DMST%theta_st(i,j) + p%DMST%dTheta(j)/2.0_ReKi
+      end do
+   end do
+
+   ! Streamtube corresponding to each blade node
+   do k = 1,p%numBlades
+      do j = 1,p%NumBlNds
+         do i = 1,2*p%DMST%Nst
+            if ( theta_b(k) >= theta_st_r(1,i,j) .and. theta_b(k) < theta_st_r(2,i,j) ) then
+               m%DMST_u%blade_st(j,k) = i
+            end if
+         end do
+      end do
+   end do
 
    m%DMST_u%UserProp = u%UserProp
    

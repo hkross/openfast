@@ -54,8 +54,9 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            InputType                     ReKi                     omega                           -          -          -          "Rotor angular velocity" rad/s
 typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}{:}  -          -          "Free-stream velocity" m/s
 typedef   ^                            ^                             ReKi                     pitch                           {:}        -          -          "Blade pitch angle" rad
+typedef   ^                            ^                             INTEGER                  blade_st                        {:}{:}     -          -          "Streamtube corresponding to each blade node" -
 typedef   ^                            ^                             ReKi                     UserProp                        {:}{:}     -          -          "Optional user property for interpolating airfoils (per element per blade)" -
 #
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
-typedef   ^                            OutputType                    ReKi                     Vind                            {:}{:}     -          -          "Global induced velocity" m/s
+typedef   ^                            OutputType                    ReKi                     Vind                            {:}{:}{:}  -          -          "Global induced velocity" m/s

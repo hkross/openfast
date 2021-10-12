@@ -74,12 +74,13 @@ IMPLICIT NONE
     REAL(ReKi)  :: omega      !< Rotor angular velocity [rad/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vinf      !< Free-stream velocity [m/s]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: pitch      !< Blade pitch angle [rad]
+    INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_st      !< Streamtube corresponding to each blade node [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: UserProp      !< Optional user property for interpolating airfoils (per element per blade) [-]
   END TYPE DMST_InputType
 ! =======================
 ! =========  DMST_OutputType  =======
   TYPE, PUBLIC :: DMST_OutputType
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Vind      !< Global induced velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vind      !< Global induced velocity [m/s]
   END TYPE DMST_OutputType
 ! =======================
 CONTAINS
@@ -1201,6 +1202,20 @@ IF (ALLOCATED(SrcInputData%pitch)) THEN
   END IF
     DstInputData%pitch = SrcInputData%pitch
 ENDIF
+IF (ALLOCATED(SrcInputData%blade_st)) THEN
+  i1_l = LBOUND(SrcInputData%blade_st,1)
+  i1_u = UBOUND(SrcInputData%blade_st,1)
+  i2_l = LBOUND(SrcInputData%blade_st,2)
+  i2_u = UBOUND(SrcInputData%blade_st,2)
+  IF (.NOT. ALLOCATED(DstInputData%blade_st)) THEN 
+    ALLOCATE(DstInputData%blade_st(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%blade_st.', ErrStat, ErrMsg,RoutineName)
+      RETURN
+    END IF
+  END IF
+    DstInputData%blade_st = SrcInputData%blade_st
+ENDIF
 IF (ALLOCATED(SrcInputData%UserProp)) THEN
   i1_l = LBOUND(SrcInputData%UserProp,1)
   i1_u = UBOUND(SrcInputData%UserProp,1)
@@ -1231,6 +1246,9 @@ IF (ALLOCATED(InputData%Vinf)) THEN
 ENDIF
 IF (ALLOCATED(InputData%pitch)) THEN
   DEALLOCATE(InputData%pitch)
+ENDIF
+IF (ALLOCATED(InputData%blade_st)) THEN
+  DEALLOCATE(InputData%blade_st)
 ENDIF
 IF (ALLOCATED(InputData%UserProp)) THEN
   DEALLOCATE(InputData%UserProp)
@@ -1282,6 +1300,11 @@ ENDIF
   IF ( ALLOCATED(InData%pitch) ) THEN
     Int_BufSz   = Int_BufSz   + 2*1  ! pitch upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%pitch)  ! pitch
+  END IF
+  Int_BufSz   = Int_BufSz   + 1     ! blade_st allocated yes/no
+  IF ( ALLOCATED(InData%blade_st) ) THEN
+    Int_BufSz   = Int_BufSz   + 2*2  ! blade_st upper/lower bounds for each dimension
+      Int_BufSz  = Int_BufSz  + SIZE(InData%blade_st)  ! blade_st
   END IF
   Int_BufSz   = Int_BufSz   + 1     ! UserProp allocated yes/no
   IF ( ALLOCATED(InData%UserProp) ) THEN
@@ -1355,6 +1378,26 @@ ENDIF
       DO i1 = LBOUND(InData%pitch,1), UBOUND(InData%pitch,1)
         ReKiBuf(Re_Xferred) = InData%pitch(i1)
         Re_Xferred = Re_Xferred + 1
+      END DO
+  END IF
+  IF ( .NOT. ALLOCATED(InData%blade_st) ) THEN
+    IntKiBuf( Int_Xferred ) = 0
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    IntKiBuf( Int_Xferred ) = 1
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%blade_st,1)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%blade_st,1)
+    Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%blade_st,2)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%blade_st,2)
+    Int_Xferred = Int_Xferred + 2
+
+      DO i2 = LBOUND(InData%blade_st,2), UBOUND(InData%blade_st,2)
+        DO i1 = LBOUND(InData%blade_st,1), UBOUND(InData%blade_st,1)
+          IntKiBuf(Int_Xferred) = InData%blade_st(i1,i2)
+          Int_Xferred = Int_Xferred + 1
+        END DO
       END DO
   END IF
   IF ( .NOT. ALLOCATED(InData%UserProp) ) THEN
@@ -1456,6 +1499,29 @@ ENDIF
         Re_Xferred = Re_Xferred + 1
       END DO
   END IF
+  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! blade_st not allocated
+    Int_Xferred = Int_Xferred + 1
+  ELSE
+    Int_Xferred = Int_Xferred + 1
+    i1_l = IntKiBuf( Int_Xferred    )
+    i1_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    i2_l = IntKiBuf( Int_Xferred    )
+    i2_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
+    IF (ALLOCATED(OutData%blade_st)) DEALLOCATE(OutData%blade_st)
+    ALLOCATE(OutData%blade_st(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    IF (ErrStat2 /= 0) THEN 
+       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%blade_st.', ErrStat, ErrMsg,RoutineName)
+       RETURN
+    END IF
+      DO i2 = LBOUND(OutData%blade_st,2), UBOUND(OutData%blade_st,2)
+        DO i1 = LBOUND(OutData%blade_st,1), UBOUND(OutData%blade_st,1)
+          OutData%blade_st(i1,i2) = IntKiBuf(Int_Xferred)
+          Int_Xferred = Int_Xferred + 1
+        END DO
+      END DO
+  END IF
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! UserProp not allocated
     Int_Xferred = Int_Xferred + 1
   ELSE
@@ -1491,6 +1557,7 @@ ENDIF
    INTEGER(IntKi)                 :: i,j,k
    INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
    INTEGER(IntKi)                 :: i2, i2_l, i2_u  !  bounds (upper/lower) for an array dimension 2
+   INTEGER(IntKi)                 :: i3, i3_l, i3_u  !  bounds (upper/lower) for an array dimension 3
    INTEGER(IntKi)                 :: ErrStat2
    CHARACTER(ErrMsgLen)           :: ErrMsg2
    CHARACTER(*), PARAMETER        :: RoutineName = 'DMST_CopyOutput'
@@ -1502,8 +1569,10 @@ IF (ALLOCATED(SrcOutputData%Vind)) THEN
   i1_u = UBOUND(SrcOutputData%Vind,1)
   i2_l = LBOUND(SrcOutputData%Vind,2)
   i2_u = UBOUND(SrcOutputData%Vind,2)
+  i3_l = LBOUND(SrcOutputData%Vind,3)
+  i3_u = UBOUND(SrcOutputData%Vind,3)
   IF (.NOT. ALLOCATED(DstOutputData%Vind)) THEN 
-    ALLOCATE(DstOutputData%Vind(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    ALLOCATE(DstOutputData%Vind(i1_l:i1_u,i2_l:i2_u,i3_l:i3_u),STAT=ErrStat2)
     IF (ErrStat2 /= 0) THEN 
       CALL SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%Vind.', ErrStat, ErrMsg,RoutineName)
       RETURN
@@ -1564,7 +1633,7 @@ ENDIF
   Int_BufSz  = 0
   Int_BufSz   = Int_BufSz   + 1     ! Vind allocated yes/no
   IF ( ALLOCATED(InData%Vind) ) THEN
-    Int_BufSz   = Int_BufSz   + 2*2  ! Vind upper/lower bounds for each dimension
+    Int_BufSz   = Int_BufSz   + 2*3  ! Vind upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%Vind)  ! Vind
   END IF
   IF ( Re_BufSz  .GT. 0 ) THEN 
@@ -1606,11 +1675,16 @@ ENDIF
     IntKiBuf( Int_Xferred    ) = LBOUND(InData%Vind,2)
     IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Vind,2)
     Int_Xferred = Int_Xferred + 2
+    IntKiBuf( Int_Xferred    ) = LBOUND(InData%Vind,3)
+    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%Vind,3)
+    Int_Xferred = Int_Xferred + 2
 
-      DO i2 = LBOUND(InData%Vind,2), UBOUND(InData%Vind,2)
-        DO i1 = LBOUND(InData%Vind,1), UBOUND(InData%Vind,1)
-          ReKiBuf(Re_Xferred) = InData%Vind(i1,i2)
-          Re_Xferred = Re_Xferred + 1
+      DO i3 = LBOUND(InData%Vind,3), UBOUND(InData%Vind,3)
+        DO i2 = LBOUND(InData%Vind,2), UBOUND(InData%Vind,2)
+          DO i1 = LBOUND(InData%Vind,1), UBOUND(InData%Vind,1)
+            ReKiBuf(Re_Xferred) = InData%Vind(i1,i2,i3)
+            Re_Xferred = Re_Xferred + 1
+          END DO
         END DO
       END DO
   END IF
@@ -1631,6 +1705,7 @@ ENDIF
   INTEGER(IntKi)                 :: i
   INTEGER(IntKi)                 :: i1, i1_l, i1_u  !  bounds (upper/lower) for an array dimension 1
   INTEGER(IntKi)                 :: i2, i2_l, i2_u  !  bounds (upper/lower) for an array dimension 2
+  INTEGER(IntKi)                 :: i3, i3_l, i3_u  !  bounds (upper/lower) for an array dimension 3
   INTEGER(IntKi)                 :: ErrStat2
   CHARACTER(ErrMsgLen)           :: ErrMsg2
   CHARACTER(*), PARAMETER        :: RoutineName = 'DMST_UnPackOutput'
@@ -1654,16 +1729,21 @@ ENDIF
     i2_l = IntKiBuf( Int_Xferred    )
     i2_u = IntKiBuf( Int_Xferred + 1)
     Int_Xferred = Int_Xferred + 2
+    i3_l = IntKiBuf( Int_Xferred    )
+    i3_u = IntKiBuf( Int_Xferred + 1)
+    Int_Xferred = Int_Xferred + 2
     IF (ALLOCATED(OutData%Vind)) DEALLOCATE(OutData%Vind)
-    ALLOCATE(OutData%Vind(i1_l:i1_u,i2_l:i2_u),STAT=ErrStat2)
+    ALLOCATE(OutData%Vind(i1_l:i1_u,i2_l:i2_u,i3_l:i3_u),STAT=ErrStat2)
     IF (ErrStat2 /= 0) THEN 
        CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%Vind.', ErrStat, ErrMsg,RoutineName)
        RETURN
     END IF
-      DO i2 = LBOUND(OutData%Vind,2), UBOUND(OutData%Vind,2)
-        DO i1 = LBOUND(OutData%Vind,1), UBOUND(OutData%Vind,1)
-          OutData%Vind(i1,i2) = ReKiBuf(Re_Xferred)
-          Re_Xferred = Re_Xferred + 1
+      DO i3 = LBOUND(OutData%Vind,3), UBOUND(OutData%Vind,3)
+        DO i2 = LBOUND(OutData%Vind,2), UBOUND(OutData%Vind,2)
+          DO i1 = LBOUND(OutData%Vind,1), UBOUND(OutData%Vind,1)
+            OutData%Vind(i1,i2,i3) = ReKiBuf(Re_Xferred)
+            Re_Xferred = Re_Xferred + 1
+          END DO
         END DO
       END DO
   END IF
@@ -1786,6 +1866,8 @@ IF (ALLOCATED(u_out%pitch) .AND. ALLOCATED(u1%pitch)) THEN
     u_out%pitch(i1) = u1%pitch(i1) + b * ScaleFactor
   END DO
 END IF ! check if allocated
+IF (ALLOCATED(u_out%blade_st) .AND. ALLOCATED(u1%blade_st)) THEN
+END IF ! check if allocated
 IF (ALLOCATED(u_out%UserProp) .AND. ALLOCATED(u1%UserProp)) THEN
   DO i2 = LBOUND(u_out%UserProp,2),UBOUND(u_out%UserProp,2)
     DO i1 = LBOUND(u_out%UserProp,1),UBOUND(u_out%UserProp,1)
@@ -1875,6 +1957,8 @@ IF (ALLOCATED(u_out%pitch) .AND. ALLOCATED(u1%pitch)) THEN
     c = ( (t(2)-t(3))*u1%pitch(i1) + t(3)*u2%pitch(i1) - t(2)*u3%pitch(i1) ) * scaleFactor
     u_out%pitch(i1) = u1%pitch(i1) + b  + c * t_out
   END DO
+END IF ! check if allocated
+IF (ALLOCATED(u_out%blade_st) .AND. ALLOCATED(u1%blade_st)) THEN
 END IF ! check if allocated
 IF (ALLOCATED(u_out%UserProp) .AND. ALLOCATED(u1%UserProp)) THEN
   DO i2 = LBOUND(u_out%UserProp,2),UBOUND(u_out%UserProp,2)
@@ -1968,8 +2052,10 @@ END IF ! check if allocated
  CHARACTER(ErrMsgLen)                       :: ErrMsg2  ! local errors
  INTEGER                                    :: i01    ! dim1 level 0 counter variable for arrays of ddts
  INTEGER                                    :: i02    ! dim2 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i03    ! dim3 level 0 counter variable for arrays of ddts
  INTEGER                                    :: i1    ! dim1 counter variable for arrays
  INTEGER                                    :: i2    ! dim2 counter variable for arrays
+ INTEGER                                    :: i3    ! dim3 counter variable for arrays
     ! Initialize ErrStat
  ErrStat = ErrID_None
  ErrMsg  = ""
@@ -1985,10 +2071,12 @@ END IF ! check if allocated
 
    ScaleFactor = t_out / t(2)
 IF (ALLOCATED(y_out%Vind) .AND. ALLOCATED(y1%Vind)) THEN
-  DO i2 = LBOUND(y_out%Vind,2),UBOUND(y_out%Vind,2)
-    DO i1 = LBOUND(y_out%Vind,1),UBOUND(y_out%Vind,1)
-      b = -(y1%Vind(i1,i2) - y2%Vind(i1,i2))
-      y_out%Vind(i1,i2) = y1%Vind(i1,i2) + b * ScaleFactor
+  DO i3 = LBOUND(y_out%Vind,3),UBOUND(y_out%Vind,3)
+    DO i2 = LBOUND(y_out%Vind,2),UBOUND(y_out%Vind,2)
+      DO i1 = LBOUND(y_out%Vind,1),UBOUND(y_out%Vind,1)
+        b = -(y1%Vind(i1,i2,i3) - y2%Vind(i1,i2,i3))
+        y_out%Vind(i1,i2,i3) = y1%Vind(i1,i2,i3) + b * ScaleFactor
+      END DO
     END DO
   END DO
 END IF ! check if allocated
@@ -2029,8 +2117,10 @@ END IF ! check if allocated
  CHARACTER(*),            PARAMETER         :: RoutineName = 'DMST_Output_ExtrapInterp2'
  INTEGER                                    :: i01    ! dim1 level 0 counter variable for arrays of ddts
  INTEGER                                    :: i02    ! dim2 level 0 counter variable for arrays of ddts
+ INTEGER                                    :: i03    ! dim3 level 0 counter variable for arrays of ddts
  INTEGER                                    :: i1    ! dim1 counter variable for arrays
  INTEGER                                    :: i2    ! dim2 counter variable for arrays
+ INTEGER                                    :: i3    ! dim3 counter variable for arrays
     ! Initialize ErrStat
  ErrStat = ErrID_None
  ErrMsg  = ""
@@ -2052,11 +2142,13 @@ END IF ! check if allocated
 
    ScaleFactor = t_out / (t(2) * t(3) * (t(2) - t(3)))
 IF (ALLOCATED(y_out%Vind) .AND. ALLOCATED(y1%Vind)) THEN
-  DO i2 = LBOUND(y_out%Vind,2),UBOUND(y_out%Vind,2)
-    DO i1 = LBOUND(y_out%Vind,1),UBOUND(y_out%Vind,1)
-      b = (t(3)**2*(y1%Vind(i1,i2) - y2%Vind(i1,i2)) + t(2)**2*(-y1%Vind(i1,i2) + y3%Vind(i1,i2)))* scaleFactor
-      c = ( (t(2)-t(3))*y1%Vind(i1,i2) + t(3)*y2%Vind(i1,i2) - t(2)*y3%Vind(i1,i2) ) * scaleFactor
-      y_out%Vind(i1,i2) = y1%Vind(i1,i2) + b  + c * t_out
+  DO i3 = LBOUND(y_out%Vind,3),UBOUND(y_out%Vind,3)
+    DO i2 = LBOUND(y_out%Vind,2),UBOUND(y_out%Vind,2)
+      DO i1 = LBOUND(y_out%Vind,1),UBOUND(y_out%Vind,1)
+        b = (t(3)**2*(y1%Vind(i1,i2,i3) - y2%Vind(i1,i2,i3)) + t(2)**2*(-y1%Vind(i1,i2,i3) + y3%Vind(i1,i2,i3)))* scaleFactor
+        c = ( (t(2)-t(3))*y1%Vind(i1,i2,i3) + t(3)*y2%Vind(i1,i2,i3) - t(2)*y3%Vind(i1,i2,i3) ) * scaleFactor
+        y_out%Vind(i1,i2,i3) = y1%Vind(i1,i2,i3) + b  + c * t_out
+      END DO
     END DO
   END DO
 END IF ! check if allocated
