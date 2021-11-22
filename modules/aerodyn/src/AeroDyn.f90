@@ -667,7 +667,56 @@ end if
       m%Y_Twr = 0.0_ReKi
    end if
    
+      ! Variables for optimizing outputs at blade nodes
+   allocate(m%blds(p%numBlades))
+   do k=1,p%numBlades
+      call AllocAry( m%blds(k)%BN_UrelWind_s, 3, p%numBlNds , 'Relative wind in section coordinates',   ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_AxInd   ,      p%numBlNds , 'Axial induction',                        ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_TanInd  ,      p%numBlNds , 'Tangential induction',                   ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Vrel    ,      p%numBlNds , 'Relative velocity',                      ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_alpha   ,      p%numBlNds , 'Angle of attack',                        ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_phi     ,      p%numBlNds , 'angle between the plane local wind dir', ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Re      ,      p%numBlNds , 'Reynolds number',                        ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cl_Static ,    p%numBlNds , 'Coefficient lift - no UA',               ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cd_Static ,    p%numBlNds , 'Coefficient drag - no UA',               ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cm_Static ,    p%numBlNds , 'Coefficient moment - no UA',             ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cl        ,    p%numBlNds , 'Coefficient lift - with UA',             ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cd        ,    p%numBlNds , 'Coefficient drag - with UA',             ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cm        ,    p%numBlNds , 'Coefficient moment - with UA',           ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cx        ,    p%numBlNds , 'Coefficient normal (to plane)',          ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cy        ,    p%numBlNds , 'Coefficient tangential (to plane)',      ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
    
+      m%blds(k)%BN_UrelWind_s= -999999_ReKi
+      m%blds(k)%BN_AxInd     = -999999_ReKi
+      m%blds(k)%BN_TanInd    = -999999_ReKi
+      m%blds(k)%BN_Vrel      = -999999_ReKi
+      m%blds(k)%BN_alpha     = -999999_ReKi
+      m%blds(k)%BN_phi       = -999999_ReKi
+      m%blds(k)%BN_Re        = -999999_ReKi
+      m%blds(k)%BN_Cl_Static = -999999_ReKi
+      m%blds(k)%BN_Cd_Static = -999999_ReKi
+      m%blds(k)%BN_Cm_Static = -999999_ReKi
+      m%blds(k)%BN_Cl        = -999999_ReKi
+      m%blds(k)%BN_Cd        = -999999_ReKi
+      m%blds(k)%BN_Cm        = -999999_ReKi
+      m%blds(k)%BN_Cx        = -999999_ReKi
+      m%blds(k)%BN_Cy        = -999999_ReKi
+   end do
    
 end subroutine Init_MiscVars
 !----------------------------------------------------------------------------------------------------------------------------------   
@@ -1489,7 +1538,7 @@ subroutine RotCalcOutput( t, u, p, p_AD, x, xd, z, OtherState, y, m, ErrStat, Er
       ! avoid issues with the coupling code
       call DMST_CalcOutput( m%DMST_u, p%DMST, p_AD%AFI, m%DMST_y, ErrStat2, ErrMsg2 )
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      call SetOutputsFromFVW( p, m, y )
+!      call SetOutputsFromDMST( p, m, y )
    endif
 
    if ( p%TwrAero ) then
@@ -2318,21 +2367,21 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
             y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, m%rotors(iR)%WithoutSweepPitchTwist(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
 
             ! Save results for outputs so we don't have to recalculate them all when we write outputs
-            m%FVW%W(iW)%BN_AxInd(j)           = AxInd
-            m%FVW%W(iW)%BN_TanInd(j)          = TanInd
-            m%FVW%W(iW)%BN_Vrel(j)            = Vrel
-            m%FVW%W(iW)%BN_alpha(j)           = alpha
-            m%FVW%W(iW)%BN_phi(j)             = phi
-            m%FVW%W(iW)%BN_Re(j)              = Re
-            m%FVW%W(iW)%BN_UrelWind_s(1:3,j)  = UrelWind_s(1:3)
-            m%FVW%W(iW)%BN_Cl_Static(j)       = Cl_Static
-            m%FVW%W(iW)%BN_Cd_Static(j)       = Cd_Static
-            m%FVW%W(iW)%BN_Cm_Static(j)       = Cm_Static
-            m%FVW%W(iW)%BN_Cl(j)              = Cl_dyn
-            m%FVW%W(iW)%BN_Cd(j)              = Cd_dyn
-            m%FVW%W(iW)%BN_Cm(j)              = Cm_dyn
-            m%FVW%W(iW)%BN_Cx(j)              = Cx
-            m%FVW%W(iW)%BN_Cy(j)              = Cy
+            m%rotors(iR)%blds(k)%BN_AxInd(j)           = AxInd
+            m%rotors(iR)%blds(k)%BN_TanInd(j)          = TanInd
+            m%rotors(iR)%blds(k)%BN_Vrel(j)            = Vrel
+            m%rotors(iR)%blds(k)%BN_alpha(j)           = alpha
+            m%rotors(iR)%blds(k)%BN_phi(j)             = phi
+            m%rotors(iR)%blds(k)%BN_Re(j)              = Re
+            m%rotors(iR)%blds(k)%BN_UrelWind_s(1:3,j)  = UrelWind_s(1:3)
+            m%rotors(iR)%blds(k)%BN_Cl_Static(j)       = Cl_Static
+            m%rotors(iR)%blds(k)%BN_Cd_Static(j)       = Cd_Static
+            m%rotors(iR)%blds(k)%BN_Cm_Static(j)       = Cm_Static
+            m%rotors(iR)%blds(k)%BN_Cl(j)              = Cl_dyn
+            m%rotors(iR)%blds(k)%BN_Cd(j)              = Cd_dyn
+            m%rotors(iR)%blds(k)%BN_Cm(j)              = Cm_dyn
+            m%rotors(iR)%blds(k)%BN_Cx(j)              = Cx
+            m%rotors(iR)%blds(k)%BN_Cy(j)              = Cy
          end do !j=nodes
       end do !k=blades
    end do ! iR rotors
