@@ -1355,7 +1355,7 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
          end if       
       enddo
 
-   else  ! Call the FVW sub module
+   elseif (p%WakeMod /= WakeMod_DMST) then  ! Call the FVW sub module
          ! This needs to extract the inputs from the AD data types (mesh) and copy pieces for the FVW module
       call SetInputsForFVW(p, u, m, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -2045,8 +2045,9 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    call GeomWithoutSweepPitchTwist( p, u, m, thetaBladeNds, ErrStat, ErrMsg )
    if (ErrStat >= AbortErrLev) return
 
+      ! Local pitch + twist (aerodynamic + elastic) angle, rad
    do k=1,p%NumBlades
-      m%DMST_u%PitchAndTwist(:,k) = thetaBladeNds(:,k) ! local pitch + twist (aerodynamic + elastic) angle of the jth node on the kth blade
+      m%DMST_u%PitchAndTwist(:,k) = thetaBladeNds(:,k)
    end do
       
       ! Free-stream velocity, m/s
