@@ -23,7 +23,7 @@ MODULE AeroDyn_IO
    use NWTC_Library
    use AeroDyn_Types
    use BEMTUncoupled, only : SkewMod_Uncoupled, SkewMod_PittPeters, VelocityIsZero
-   use FVW_Subs,      only : FVW_AeroOuts
+   use FVW_Subs,      only : LL_AeroOuts
 
    USE AeroDyn_AllBldNdOuts_IO
    
@@ -1704,10 +1704,10 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, m, m_AD, y, OtherState, xd, indx, iRot,
       
    end do ! out nodes
 
-   if (p_AD%WakeMod /= WakeMod_FVW) then
+   if (p_AD%WakeMod /= WakeMod_FVW .and. p_AD%WakeMod /= WakeMod_DMST) then
       call Calc_WriteOutput_BEMT
    else
-      call Calc_WriteOutput_FVW
+      call Calc_WriteOutput_LL
    endif
 
    ! blade node tower clearance (requires tower influence calculation):
@@ -1901,7 +1901,7 @@ CONTAINS
    !! NOTE: relies on the prior calculation of m%V_dot_x, and m%V_diskAvg (done in DiskAvgValues)
    !!                                          m%DisturbedInflow (done in SetInputs)
    !!       Make sure these are set!
-   subroutine Calc_WriteOutput_FVW
+   subroutine Calc_WriteOutput_LL
       integer    :: iW
       real(ReKi) :: rmax, omega
 
@@ -1944,7 +1944,11 @@ CONTAINS
             m%AllOuts( BNTnInd(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_TanInd(j)
 
             m%AllOuts( BNAlpha(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_alpha(j)*R2D
-            m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
+            if ( p_AD%WakeMod == WakeMod_FVW ) then
+               m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
+            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
+               m%AllOuts( BNTheta(beta,k) ) = m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k)*R2D
+            endif
             m%AllOuts( BNPhi(  beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_phi(j)*R2D
 !             m%AllOuts( BNCurve(beta,k) ) = m%Curve(j,k)*R2D ! TODO
 
@@ -1958,8 +1962,13 @@ CONTAINS
             m%AllOuts( BNCx(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)
             m%AllOuts( BNCy(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cy(j)
 
-            ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! cos(theta)
-            st=sin(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! sin(theta)
+            if ( p_AD%WakeMod == WakeMod_FVW ) then
+               ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! cos(theta)
+               st=sin(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! sin(theta)
+            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
+               ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k))     ! cos(theta)
+               st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k))     ! sin(theta)
+            endif
             m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*ct + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*st
             m%AllOuts( BNCt(   beta,k) ) =-m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*st + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*ct
 
@@ -1973,7 +1982,11 @@ CONTAINS
             m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)*ct - m%Y(j,k)*st
             m%AllOuts( BNFt(   beta,k) ) = -m%X(j,k)*st - m%Y(j,k)*ct
 
-            m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
+            if ( p_AD%WakeMod == WakeMod_FVW ) then
+               m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
+            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
+               m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%rotors(iRot)%DMST%chord(j,k) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
+            endif
          end do ! nodes
       end do ! blades
 
@@ -2057,7 +2070,7 @@ CONTAINS
          m%AllOuts( BAeroMz(k) ) = tmp(3)
      end do  ! k=blades
 
-   end subroutine Calc_WriteOutput_FVW
+   end subroutine Calc_WriteOutput_LL
 
 END SUBROUTINE Calc_WriteOutput
 !----------------------------------------------------------------------------------------------------------------------------------

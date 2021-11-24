@@ -31,7 +31,7 @@ module AeroDyn
    use AeroAcoustics
    use UnsteadyAero
    use FVW
-   use FVW_Subs, only: FVW_AeroOuts
+   use FVW_Subs, only: LL_AeroOuts
    
    implicit none
 
@@ -1538,7 +1538,8 @@ subroutine RotCalcOutput( t, u, p, p_AD, x, xd, z, OtherState, y, m, ErrStat, Er
       ! avoid issues with the coupling code
       call DMST_CalcOutput( m%DMST_u, p%DMST, p_AD%AFI, m%DMST_y, ErrStat2, ErrMsg2 )
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-!      call SetOutputsFromDMST( p, m, y )
+      call SetOutputsFromDMST( u, p, p_AD, m, y, ErrStat2, ErrMsg2 )
+         call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
    endif
 
    if ( p%TwrAero ) then
@@ -2043,6 +2044,10 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    call DiskAvgValues( p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth )
    call GeomWithoutSweepPitchTwist( p, u, m, thetaBladeNds, ErrStat, ErrMsg )
    if (ErrStat >= AbortErrLev) return
+
+   do k=1,p%NumBlades
+      m%DMST_u%PitchAndTwist(:,k) = thetaBladeNds(:,k) ! local pitch + twist (aerodynamic + elastic) angle of the jth node on the kth blade
+   end do
       
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
@@ -2064,8 +2069,8 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    ! Azimuthal location of each blade, rad
    theta_b_tmp = EulerExtract( matmul(u%HubMotion%Orientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
    theta_b(1) = theta_b_tmp(1)
-   do k = 2,p%numBlades
-      theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%numBlades*(k-1)
+   do k = 2,p%NumBlades
+      theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%NumBlades*(k-1)
    end do
 
    ! Range of azimuth angles within each streamtube
@@ -2077,7 +2082,7 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    end do
 
    ! Streamtube corresponding to each blade node
-   do k = 1,p%numBlades
+   do k = 1,p%NumBlades
       do j = 1,p%NumBlNds
          do i = 1,2*p%DMST%Nst
             if ( theta_b(k) >= theta_st_r(1,i,j) .and. theta_b(k) < theta_st_r(2,i,j) ) then
@@ -2313,7 +2318,7 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
             Vstr = u%rotors(iR)%BladeMotion(k)%TranslationVel(1:3,j)
             Vwnd = m%rotors(iR)%DisturbedInflow(1:3,j,k)   ! NOTE: contains tower shadow
             theta = m%FVW%W(iW)%PitchAndTwist(j) ! TODO
-            call FVW_AeroOuts( m%rotors(iR)%WithoutSweepPitchTwist(1:3,1:3,j,k), u%rotors(iR)%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
+            call LL_AeroOuts( m%rotors(iR)%WithoutSweepPitchTwist(1:3,1:3,j,k), u%rotors(iR)%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
                         theta, Vstr(1:3), Vind(1:3), VWnd(1:3), p%rotors(iR)%KinVisc, p%FVW%W(iW)%chord_LL(j), &               ! inputs
                         AxInd, TanInd, Vrel, phi, alpha, Re, UrelWind_s(1:3), ErrStat2, ErrMsg2 )        ! outputs
                call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'SetOutputsFromFVW')
@@ -2394,6 +2399,109 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
    end if
    
 end subroutine SetOutputsFromFVW
+!----------------------------------------------------------------------------------------------------------------------------------
+!> This subroutine converts outputs from DMST (stored in m%DMST_y) into values on the AeroDyn BladeLoad output mesh.
+subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
+   type(RotInputType),        intent(in   ) :: u           ! Inputs at time t
+   type(RotParameterType),    intent(in   ) :: p           ! Parameters
+   type(AD_ParameterType),    intent(in   ) :: p_AD        ! AD parameters
+   type(RotMiscVarType),      intent(inout) :: m           ! Misc/optimization variables
+   type(RotOutputType),       intent(inout) :: y           ! Outputs
+   integer(IntKi),            intent(  out) :: ErrStat     ! Error status of the operation
+   character(*),              intent(  out) :: ErrMsg      ! Error message if ErrStat /= ErrID_None
+
+   ! Local variables
+   integer(intKi)                           :: j           ! Loop counter for nodes
+   integer(intKi)                           :: k           ! Loop counter for blades
+   real(reki)                               :: force(3)
+   real(reki)                               :: moment(3)
+   real(reki)                               :: q
+   real(ReKi)                               :: cp, sp      ! Cosine, sine of phi
+
+   ! Local variables for readability
+   real(ReKi)                               :: Vind(3)
+   real(ReKi)                               :: Vstr(3)
+   real(ReKi)                               :: Vwnd(3)
+   real(ReKi)                               :: theta
+
+   ! Local variables stored in misc for nodal outputs
+   real(ReKi)                               :: AxInd, TanInd, Vrel, phi, alpha, Re
+   type(AFI_OutputType)                     :: AFI_interp     ! Resulting values from lookup table
+   real(ReKi)                               :: UrelWind_s(3)  ! Relative wind (wind+str) in section coordinates
+   real(ReKi)                               :: Cx, Cy
+   real(ReKi)                               :: Cl_static, Cd_static, Cm_static
+   real(ReKi)                               :: Cl_dyn, Cd_dyn, Cm_dyn
+   integer(intKi)                           :: ErrStat2
+   character(ErrMsgLen)                     :: ErrMsg2
+
+   ErrStat = 0
+   ErrMsg = ""
+
+   ! Zero forces
+   force(3)    =  0.0_ReKi
+   moment(1:2) =  0.0_ReKi
+
+   do k=1,p%numBlades
+      do j=1,p%NumBlNds
+         ! --- Compute main aero variables from induction - set local variables
+         Vind = m%DMST_y%Vind(1:3,j,k)
+         Vstr = u%BladeMotion(k)%TranslationVel(1:3,j)
+         Vwnd = m%DisturbedInflow(1:3,j,k) ! NOTE: contains tower shadow
+         theta = m%DMST_u%PitchAndTwist(j,k) ! TODO
+         call LL_AeroOuts( m%WithoutSweepPitchTwist(1:3,1:3,j,k), u%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
+                     theta, Vstr(1:3), Vind(1:3), Vwnd(1:3), p%KinVisc, p%DMST%chord(j,k), &                 ! inputs
+                     AxInd, TanInd, Vrel, phi, alpha, Re, UrelWind_s(1:3), ErrStat2, ErrMsg2 )               ! outputs
+            call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'SetOutputsFromDMST')
+
+         ! Compute steady airfoil coefficients
+         call AFI_ComputeAirfoilCoefs( alpha, Re, 0.0_ReKi, p_AD%AFI(p%DMST%AFindx(j,k)), AFI_interp, ErrStat, ErrMsg )
+         Cl_static = AFI_interp%Cl
+         Cd_static = AFI_interp%Cd
+         Cm_static = AFI_interp%Cm
+
+         ! Set dynamic airfoil coefficients (will be same as static if UA_Flag is false)
+         Cl_dyn    = AFI_interp%Cl
+         Cd_dyn    = AFI_interp%Cd
+         Cm_dyn    = AFI_interp%Cm
+            
+         cp = cos(phi)
+         sp = sin(phi)
+         Cx = Cl_dyn*cp + Cd_dyn*sp
+         Cy = Cl_dyn*sp - Cd_dyn*cp
+
+         q = 0.5 * p%airDens * Vrel**2                 ! dynamic pressure of the jth node on the kth blade
+         force(1) =  Cx * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to plane, not chord) of the jth node on the kth blade
+         force(2) = -Cy * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to plane, not chord) of the jth node on the kth blade
+         moment(3)=  Cm_dyn * q * p%DMST%chord(j,k)**2 ! pitching moment per unit length of the jth node on the kth blade
+
+            ! save these values for possible output later:
+         m%X(j,k) = force(1)
+         m%Y(j,k) = force(2)
+         m%M(j,k) = moment(3)
+
+         y%BladeLoad(k)%force(:,j)  = matmul( force,  m%WithoutSweepPitchTwist(:,:,j,k) )  ! force per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%moment(:,j) = matmul( moment, m%WithoutSweepPitchTwist(:,:,j,k) )  ! moment per unit length of the jth node on the kth blade
+
+         ! Save results for outputs so we don't have to recalculate them all when we write outputs
+         m%blds(k)%BN_AxInd(j)           = AxInd
+         m%blds(k)%BN_TanInd(j)          = TanInd
+         m%blds(k)%BN_Vrel(j)            = Vrel
+         m%blds(k)%BN_alpha(j)           = alpha
+         m%blds(k)%BN_phi(j)             = phi
+         m%blds(k)%BN_Re(j)              = Re
+         m%blds(k)%BN_UrelWind_s(1:3,j)  = UrelWind_s(1:3)
+         m%blds(k)%BN_Cl_static(j)       = Cl_static
+         m%blds(k)%BN_Cd_static(j)       = Cd_static
+         m%blds(k)%BN_Cm_static(j)       = Cm_static
+         m%blds(k)%BN_Cl(j)              = Cl_dyn
+         m%blds(k)%BN_Cd(j)              = Cd_dyn
+         m%blds(k)%BN_Cm(j)              = Cm_dyn
+         m%blds(k)%BN_Cx(j)              = Cx
+         m%blds(k)%BN_Cy(j)              = Cy
+      end do !j=nodes
+   end do !k=blades
+   
+end subroutine SetOutputsFromDMST
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine validates the inputs from the AeroDyn input files.
 SUBROUTINE ValidateNumBlades( NumBl, ErrStat, ErrMsg )
