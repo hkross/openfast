@@ -34,6 +34,7 @@ True          TIDrag             - Include the drag term in the tangential-induc
 ======  OLAF -- cOnvecting LAgrangian Filaments (Free Vortex Wake) Theory Options  ================== [used only when WakeMod=3]
 "unused"      OLAFInputFileName  - Input file for OLAF [used only when WakeMod=3]
 ======  Double Multiple Streamtube Theory Options  =================================================== [used only when WakeMod=4]
+          1   DMSTMod            - Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]
           8   Nst                - Number of streamtubes [used only when WakeMod=4]
 "default"     DMSTRes            - Resolution of induction factor initial guess array [used only when WakeMod=4]
 ======  Beddoes-Leishman Unsteady Airfoil Aerodynamics Options  ===================================== [used only when AFAeroMod=2]

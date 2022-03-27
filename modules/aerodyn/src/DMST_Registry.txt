@@ -23,6 +23,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
 typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
 typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
 typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m                 
@@ -41,6 +42,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
 typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
 typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
 typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m

@@ -2284,6 +2284,9 @@ SUBROUTINE ParsePrimaryFileInfo( PriPath, InitInp, InputFile, RootName, NumBlade
    !======  Double Multiple Streamtube Theory Options  ================================================== [used only when WakeMod=4]
    if ( InputFileData%Echo )   WRITE(UnEc, '(A)') FileInfo_In%Lines(CurLine)    ! Write section break to echo
    CurLine = CurLine + 1
+      ! DMSTMod - Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]
+   call ParseVar( FileInfo_In, CurLine, "DMSTMod", InputFileData%DMSTMod, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return   
       ! Nst - Number of streamtubes [used only when WakeMod=4]
    call ParseVar( FileInfo_In, CurLine, "Nst", InputFileData%Nst, ErrStat2, ErrMsg2, UnEc )
       if (Failed()) return

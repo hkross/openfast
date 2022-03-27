@@ -157,6 +157,7 @@ typedef	^	AD_InputFile	IntKi	NumOuts	-	-	-	"Number of parameters in the output l
 typedef	^	AD_InputFile	CHARACTER(ChanLen)	OutList	{:}	-	-	"List of user-requested output channels"	-
 typedef	^	AD_InputFile	ReKi	tau1_const	-	-	-	"time constant for DBEMT [used only when WakeMod=2 and DBEMT_Mod/=2]"	s
 typedef	^	AD_InputFile	IntKi	DBEMT_Mod	-	-	-	"Type of dynamic BEMT (DBEMT) model {1=constant tau1, 2=time-dependent tau1}"	-
+typedef	^	AD_InputFile	IntKi	DMSTMod     -   -   -   "Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]" -
 typedef	^	AD_InputFile	IntKi	Nst      	-	-	-	"Number of streamtubes [used only when WakeMod=4]"	-
 typedef	^	AD_InputFile	ReKi	DMSTRes	    -	-	-	"Resolution of induction factor initial guess array [used only when WakeMod=4]"	-
 typedef	^	AD_InputFile	IntKi	BldNd_NumOuts	-	-	-	"Number of requested output channels per blade node (AD_AllBldNdOuts)"	-

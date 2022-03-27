@@ -42,6 +42,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: kinVisc      !< Kinematic air viscosity [m^2/s]
     INTEGER(IntKi)  :: numBladeNodes      !< Number of blade nodes used in the analysis [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: AFindx      !< Index of airfoil data file for blade node location [array of numBladeNodes] [-]
+    INTEGER(IntKi)  :: DMSTMod      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes      !< Resolution of induction factor initial guess array [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: radius      !< Rotor radius [m]
@@ -61,6 +62,7 @@ IMPLICIT NONE
     REAL(ReKi)  :: kinVisc      !< Kinematic air viscosity [m^2/s]
     INTEGER(IntKi)  :: numBladeNodes      !< Number of blade nodes used in the analysis [-]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: AFindx      !< Index of airfoil data file for blade node location [array of numBladeNodes] [-]
+    INTEGER(IntKi)  :: DMSTMod      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes      !< Resolution of induction factor initial guess array [-]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: radius      !< Rotor radius [m]
@@ -134,6 +136,7 @@ IF (ALLOCATED(SrcInitInputData%AFindx)) THEN
   END IF
     DstInitInputData%AFindx = SrcInitInputData%AFindx
 ENDIF
+    DstInitInputData%DMSTMod = SrcInitInputData%DMSTMod
     DstInitInputData%Nst = SrcInitInputData%Nst
     DstInitInputData%DMSTRes = SrcInitInputData%DMSTRes
 IF (ALLOCATED(SrcInitInputData%radius)) THEN
@@ -219,6 +222,7 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*2  ! AFindx upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%AFindx)  ! AFindx
   END IF
+      Int_BufSz  = Int_BufSz  + 1  ! DMSTMod
       Int_BufSz  = Int_BufSz  + 1  ! Nst
       Re_BufSz   = Re_BufSz   + 1  ! DMSTRes
   Int_BufSz   = Int_BufSz   + 1     ! radius allocated yes/no
@@ -301,6 +305,8 @@ ENDIF
         END DO
       END DO
   END IF
+    IntKiBuf(Int_Xferred) = InData%DMSTMod
+    Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%Nst
     Int_Xferred = Int_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%DMSTRes
@@ -405,6 +411,8 @@ ENDIF
         END DO
       END DO
   END IF
+    OutData%DMSTMod = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
     OutData%Nst = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     OutData%DMSTRes = ReKiBuf(Re_Xferred)
@@ -687,6 +695,7 @@ IF (ALLOCATED(SrcParamData%AFindx)) THEN
   END IF
     DstParamData%AFindx = SrcParamData%AFindx
 ENDIF
+    DstParamData%DMSTMod = SrcParamData%DMSTMod
     DstParamData%Nst = SrcParamData%Nst
     DstParamData%DMSTRes = SrcParamData%DMSTRes
 IF (ALLOCATED(SrcParamData%radius)) THEN
@@ -820,6 +829,7 @@ ENDIF
     Int_BufSz   = Int_BufSz   + 2*2  ! AFindx upper/lower bounds for each dimension
       Int_BufSz  = Int_BufSz  + SIZE(InData%AFindx)  ! AFindx
   END IF
+      Int_BufSz  = Int_BufSz  + 1  ! DMSTMod
       Int_BufSz  = Int_BufSz  + 1  ! Nst
       Re_BufSz   = Re_BufSz   + 1  ! DMSTRes
   Int_BufSz   = Int_BufSz   + 1     ! radius allocated yes/no
@@ -919,6 +929,8 @@ ENDIF
         END DO
       END DO
   END IF
+    IntKiBuf(Int_Xferred) = InData%DMSTMod
+    Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%Nst
     Int_Xferred = Int_Xferred + 1
     ReKiBuf(Re_Xferred) = InData%DMSTRes
@@ -1074,6 +1086,8 @@ ENDIF
         END DO
       END DO
   END IF
+    OutData%DMSTMod = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
     OutData%Nst = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     OutData%DMSTRes = ReKiBuf(Re_Xferred)

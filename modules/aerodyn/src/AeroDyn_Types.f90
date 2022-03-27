@@ -184,6 +184,7 @@ IMPLICIT NONE
     CHARACTER(ChanLen) , DIMENSION(:), ALLOCATABLE  :: OutList      !< List of user-requested output channels [-]
     REAL(ReKi)  :: tau1_const      !< time constant for DBEMT [used only when WakeMod=2 and DBEMT_Mod/=2] [s]
     INTEGER(IntKi)  :: DBEMT_Mod      !< Type of dynamic BEMT (DBEMT) model {1=constant tau1, 2=time-dependent tau1} [-]
+    INTEGER(IntKi)  :: DMSTMod      !< Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4] [-]
     INTEGER(IntKi)  :: Nst      !< Number of streamtubes [used only when WakeMod=4] [-]
     REAL(ReKi)  :: DMSTRes      !< Resolution of induction factor initial guess array [used only when WakeMod=4] [-]
     INTEGER(IntKi)  :: BldNd_NumOuts      !< Number of requested output channels per blade node (AD_AllBldNdOuts) [-]
@@ -3871,6 +3872,7 @@ IF (ALLOCATED(SrcInputFileData%OutList)) THEN
 ENDIF
     DstInputFileData%tau1_const = SrcInputFileData%tau1_const
     DstInputFileData%DBEMT_Mod = SrcInputFileData%DBEMT_Mod
+    DstInputFileData%DMSTMod = SrcInputFileData%DMSTMod
     DstInputFileData%Nst = SrcInputFileData%Nst
     DstInputFileData%DMSTRes = SrcInputFileData%DMSTRes
     DstInputFileData%BldNd_NumOuts = SrcInputFileData%BldNd_NumOuts
@@ -4031,6 +4033,7 @@ ENDIF
   END IF
       Re_BufSz   = Re_BufSz   + 1  ! tau1_const
       Int_BufSz  = Int_BufSz  + 1  ! DBEMT_Mod
+      Int_BufSz  = Int_BufSz  + 1  ! DMSTMod
       Int_BufSz  = Int_BufSz  + 1  ! Nst
       Re_BufSz   = Re_BufSz   + 1  ! DMSTRes
       Int_BufSz  = Int_BufSz  + 1  ! BldNd_NumOuts
@@ -4240,6 +4243,8 @@ ENDIF
     ReKiBuf(Re_Xferred) = InData%tau1_const
     Re_Xferred = Re_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%DBEMT_Mod
+    Int_Xferred = Int_Xferred + 1
+    IntKiBuf(Int_Xferred) = InData%DMSTMod
     Int_Xferred = Int_Xferred + 1
     IntKiBuf(Int_Xferred) = InData%Nst
     Int_Xferred = Int_Xferred + 1
@@ -4503,6 +4508,8 @@ ENDIF
     OutData%tau1_const = ReKiBuf(Re_Xferred)
     Re_Xferred = Re_Xferred + 1
     OutData%DBEMT_Mod = IntKiBuf(Int_Xferred)
+    Int_Xferred = Int_Xferred + 1
+    OutData%DMSTMod = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1
     OutData%Nst = IntKiBuf(Int_Xferred)
     Int_Xferred = Int_Xferred + 1

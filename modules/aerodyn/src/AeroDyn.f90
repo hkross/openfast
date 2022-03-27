@@ -2619,6 +2619,8 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
 
       if ( InputFileData%CompAA ) call SetErrStat( ErrID_Fatal, 'Cannot use aeroacoustics module with DMST model.', ErrStat, ErrMsg, RoutineName )
 
+      if ( InputFileData%DMSTMod /= 1 .and. InputFileData%DMSTMod /= 2 ) call SetErrStat( ErrID_Fatal, 'DMSTMod must be 1 or 2.', ErrStat, ErrMsg, RoutineName )
+
       if ( InputFileData%Nst <= 0 ) call SetErrStat( ErrID_Fatal, 'Nst must be greater than 0.', ErrStat, ErrMsg, RoutineName )
 
       if ( InputFileData%DMSTRes <= 0 .or. InputFileData%DMSTRes > 0.5) call SetErrStat( ErrID_Fatal, 'DMSTRes cannot be less than or equal to 0 or greater than 0.5.', ErrStat, ErrMsg, RoutineName )
@@ -3182,7 +3184,8 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
    InitInp%numBlades        = p%NumBlades
    InitInp%numBladeNodes    = p%NumBlNds 
    InitInp%airDens          = InputFileData%AirDens 
-   InitInp%kinVisc          = InputFileData%KinVisc     
+   InitInp%kinVisc          = InputFileData%KinVisc    
+   InitInp%DMSTMod          = InputFileData%DMSTMod 
    InitInp%Nst              = InputFileData%Nst
    InitInp%DMSTRes          = InputFileData%DMSTRes
    

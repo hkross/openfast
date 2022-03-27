@@ -63,6 +63,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
    p%numBladeNodes  = InitInp%numBladeNodes 
    p%airDens        = InitInp%airDens
    p%kinVisc        = InitInp%kinVisc
+   p%DMSTMod        = InitInp%DMSTMod
    p%Nst            = InitInp%Nst
    p%DMSTRes        = InitInp%DMSTRes
 
@@ -433,22 +434,33 @@ END SUBROUTINE DMST_Init
     
 ! end subroutine BEMT_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_CTmo( indf, CTmo )
+subroutine calculate_CTmo( DMSTMod, indf, CTmo )
 ! This routine is called from DMST_CalcOutput and calculates the thrust coefficient from linear momentum theory.
 !..................................................................................................................................
+   integer(IntKi),                 intent(in   )  :: DMSTMod     ! Type of momentum theory model
    real(ReKi),                     intent(in   )  :: indf(:)     ! Array of induction factors
    real(ReKi),                     intent(inout)  :: CTmo(:)     ! Thrust coefficient from linear momentum theory
    
       ! Local variables
    integer(IntKi)                                 :: i           ! Loops through induction factors
 
-   do i = 1,size(indf)
-      if ( indf(i) < 0.6_ReKi ) then
-         CTmo(i) = 0.889 - ((0.0203 - (0.857 - indf(i))**2)/0.6427) ! thrust coefficient from linear momentum theory
-      else if ( indf(i) >= 0.6_ReKi ) then
-         CTmo(i) = 4.0*indf(i)*(1.0 - indf(i)) ! thrust coefficient from linear momentum theory
-      end if
-   end do
+   if ( DMSTMod == 1 ) then
+      do i = 1,size(indf)
+         if ( indf(i) < 0.6_ReKi ) then
+            CTmo(i) = 0.889 - ((0.0203 - (0.857 - indf(i))**2)/0.6427) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
+         else if ( indf(i) >= 0.6_ReKi ) then
+            CTmo(i) = 4.0*indf(i)*(1.0 - indf(i)) ! thrust coefficient from linear momentum theory (classic)
+         end if
+      end do
+   else if ( DMSTMod == 2 ) then
+      do i = 1,size(indf)
+         if ( indf(i) < 0.3_ReKi ) then
+            CTmo(i) = 0.889 - ((0.0203 - (0.857 - indf(i))**2)/0.6427) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
+         else if ( indf(i) >= 0.3_ReKi ) then
+            CTmo(i) = 4/3*(1.0 - indf(i))*(2.0 + indf(i))/(2.0 - indf(i)) ! thrust coefficient from linear momentum theory (high load)
+         end if
+      end do
+   end if
    
 end subroutine calculate_CTmo
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -497,9 +509,10 @@ subroutine calculate_CTbe( Vinf, indf, p, u, AFinfo, CTbe )
       
 end subroutine calculate_CTbe
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_Inductions_from_DMST( indf, tol, crossPts, crossPtsSum, CTmo, CTbe, indf_final, indf_prev )
+subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPtsSum, CTmo, CTbe, indf_final, indf_prev )
    ! This routine is called from DMST_CalcOutput and calculates the final induction factor in a streamtube.
    !..................................................................................................................................
+   integer(IntKi),                 intent(in   )                   :: DMSTMod         ! Type of momentum theory model
    real(ReKi),                     intent(in   )                   :: indf(:)         ! Array of induction factors
    real(ReKi),                     intent(in   )                   :: tol             ! Tolerance for checking induction factor values
    integer(IntKi),                 intent(in   )                   :: crossPts(:)     ! Crossing points between CTmo and CTbe
@@ -526,18 +539,34 @@ subroutine calculate_Inductions_from_DMST( indf, tol, crossPts, crossPtsSum, CTm
          if ( CTmo(i) >= CTbe(i) ) then
             m = m + 1
             CTfinal(m) = CTmo(i) + ( ( (CTmo(i) - CTbe(i)) / (CTbe(i+1) - CTbe(i)) ) / ( (1/(CTmo(i+1) - CTmo(i))) - (1/(CTbe(i+1) - CTbe(i))) ) )
-            if ( indf(i) < 0.6_ReKi ) then
-               call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
-            else if ( indf(i) >= 0.6_ReKi ) then
-               call DMST_QuadSolve_Theoretical( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+            if ( DMSTMod == 1 ) then
+               if ( indf(i) < 0.6_ReKi ) then
+                  call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               else if ( indf(i) >= 0.6_ReKi ) then
+                  call DMST_QuadSolve_Theoretical( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               end if
+            else if ( DMSTMod == 2 ) then
+               if ( indf(i) < 0.3_ReKi ) then
+                  call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               else if ( indf(i) >= 0.3_ReKi ) then
+                  call DMST_QuadSolve_HighLoad( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               end if
             end if
          else if ( CTmo(i) < CTbe(i) ) then
             m = m + 1
             CTfinal(m) = CTbe(i) + ( ( (CTbe(i) - CTmo(i)) / (CTmo(i+1) - CTmo(i)) ) / ( (1/(CTbe(i+1) - CTbe(i))) - (1/(CTmo(i+1) - CTmo(i))) ) )
-            if ( indf(i) < 0.6_ReKi ) then
-               call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
-            else if ( indf(i) >= 0.6_ReKi ) then
-               call DMST_QuadSolve_Theoretical( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+            if ( DMSTMod == 1) then
+               if ( indf(i) < 0.6_ReKi ) then
+                  call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               else if ( indf(i) >= 0.6_ReKi ) then
+                  call DMST_QuadSolve_Theoretical( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               end if
+            else if ( DMSTMod == 2 ) then
+               if ( indf(i) < 0.3_ReKi ) then
+                  call DMST_QuadSolve_Glauert( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               else if ( indf(i) >= 0.3_ReKi ) then
+                  call DMST_QuadSolve_HighLoad( tol, CTfinal(m), indf(i), indf(i+1), indf_tmp(m) )
+               end if
             end if
          end if
       end if
@@ -610,6 +639,33 @@ subroutine DMST_QuadSolve_Theoretical( tol, CTfinal, indf, indf_plus, indf_tmp )
          
 end subroutine DMST_QuadSolve_Theoretical
 !----------------------------------------------------------------------------------------------------------------------------------
+subroutine DMST_QuadSolve_HighLoad( tol, CTfinal, indf, indf_plus, indf_tmp )
+   ! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
+   !..................................................................................................................................
+      real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
+      real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
+      real(ReKi),                     intent(in   )  :: indf         ! An induction factor
+      real(ReKi),                     intent(in   )  :: indf_plus    ! An induction factor
+      real(ReKi),                     intent(inout)  :: indf_tmp     ! A possible final induction factor
+      
+         ! Local variables
+      real(ReKi)                                     :: discriminant ! Discriminant of quadratic solution
+      real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
+      real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
+   
+      discriminant = (1.0 - 3/4*CTfinal)**2 - 4.0*1.0*(3/2*CTfinal - 2.0)
+      if ( discriminant >= 0.0_ReKi ) then
+         indf_tmp1 = (3/4*CTfinal - 1.0 + sqrt(discriminant))/(2.0)
+         indf_tmp2 = (3/4*CTfinal - 1.0 - sqrt(discriminant))/(2.0)
+         if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
+            indf_tmp = indf_tmp1
+         else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
+            indf_tmp = indf_tmp2
+         end if
+      end if
+            
+   end subroutine DMST_QuadSolve_HighLoad
+!----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
 ! Routine for computing outputs.
 !..................................................................................................................................
@@ -664,14 +720,18 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
       Vinf = 0.0
 
          ! Calculate the thrust coefficient from linear momentum theory
-      call calculate_CTmo( p%indf, CTmo )
+      call calculate_CTmo( p%DMSTMod, p%indf, CTmo )
 
       if ( m == 1_IntKi ) then
          Vinf = u%Vinf
       else if ( m == 2_IntKi ) then
          do k = 1,p%numBladeNodes
             do j = 1,p%Nst
-               Vinf(1,j,k) = (2.0_ReKi*indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
+               if ( p%DMSTMod == 1 ) then
+                  Vinf(1,j,k) = (2.0_ReKi*indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
+               else if ( p%DMSTMod == 2 ) then
+                  Vinf(1,j,k) = indf_final_u(j,k)/(2.0 - indf_final_u(j,k))*u%Vinf(1,j,k)
+               end if
             end do 
          end do
       end if 
@@ -718,10 +778,10 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
          ! Calculate final thrust coefficients and induction factors
       do k = 1,p%numBladeNodes
          do j = crossPtsInd(k),p%Nst
-            call calculate_Inductions_from_DMST( p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
+            call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
          end do
          do j = 1,crossPtsInd(k)-1
-            call calculate_Inductions_from_DMST( p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
+            call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
          end do
       end do
       if ( m == 1_IntKi ) then
@@ -734,12 +794,21 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
 
    ! Calculate final induced velocities in global coordinates
    do k = 1,p%numBladeNodes
-      do j = 1,p%Nst
-         Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
-      end do
-      do j = p%Nst+1,p%Nst*2
-         Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(j-p%Nst,k) + 1.0_ReKi)*u%Vinf(1,j-p%Nst,k)
-      end do
+      if ( p%DMSTMod == 1 ) then   
+         do j = 1,p%Nst
+            Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
+         end do
+         do j = p%Nst+1,p%Nst*2
+            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(j-p%Nst,k) + 1.0_ReKi)*u%Vinf(1,j-p%Nst,k)
+         end do
+      else if ( p%DMSTMod == 2 ) then
+         do j = 1,p%Nst
+            Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
+         end do
+         do j = p%Nst+1,p%Nst*2
+            Vind_st(1,j,k) = (indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_u(j-p%Nst,k))/(2.0 - indf_final_u(j-p%Nst,k))*u%Vinf(1,j-p%Nst,k)
+         end do
+      end if
    end do
 
    ! Output induced velocity values at blade nodes
