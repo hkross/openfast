@@ -687,6 +687,8 @@ end if
          call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
       call AllocAry( m%blds(k)%BN_Cl_Static ,    p%numBlNds , 'Coefficient lift - no UA',               ErrStat2, ErrMsg2 )
          call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
+      call AllocAry( m%blds(k)%BN_Cpmin     ,    p%numBlNds , 'Coefficient minimum pressure',           ErrStat2, ErrMsg2 )
+         call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
       call AllocAry( m%blds(k)%BN_Cd_Static ,    p%numBlNds , 'Coefficient drag - no UA',               ErrStat2, ErrMsg2 )
          call SetErrStat ( ErrStat2, ErrMsg2, ErrStat,ErrMsg,RoutineName )
       call AllocAry( m%blds(k)%BN_Cm_Static ,    p%numBlNds , 'Coefficient moment - no UA',             ErrStat2, ErrMsg2 )
@@ -712,6 +714,7 @@ end if
       m%blds(k)%BN_Cl_Static = -999999_ReKi
       m%blds(k)%BN_Cd_Static = -999999_ReKi
       m%blds(k)%BN_Cm_Static = -999999_ReKi
+      m%blds(k)%BN_Cpmin     = -999999_ReKi
       m%blds(k)%BN_Cl        = -999999_ReKi
       m%blds(k)%BN_Cd        = -999999_ReKi
       m%blds(k)%BN_Cm        = -999999_ReKi

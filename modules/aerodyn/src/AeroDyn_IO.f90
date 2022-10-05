@@ -1684,7 +1684,7 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, x, m, m_AD, y, OtherState, xd, indx, iR
    
 
    ! Compute max radius and rotor speed
-   if (p_AD%WakeMod /= WakeMod_FVW) then
+   if (p_AD%WakeMod /= WakeMod_FVW .and. p_AD%WakeMod /= WakeMod_DMST) then
       rmax = 0.0_ReKi
       do k=1,p%NumBlades
          do j=1,p%NumBlNds
@@ -1959,7 +1959,10 @@ CONTAINS
 
          ! blade outputs
       do k=1,min(p%numBlades,3)
-         iW=p_AD%FVW%Bld2Wings(iRot, k)
+
+         if ( p_AD%WakeMod == WakeMod_FVW ) then
+            iW=p_AD%FVW%Bld2Wings(iRot, k)
+         endif
 
          do beta=1,p%NBlOuts
             j=p%BlOutNd(beta)
