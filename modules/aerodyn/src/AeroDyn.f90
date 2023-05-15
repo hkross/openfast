@@ -3180,7 +3180,7 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
 
       ! Get disk average values and orientations
    call DiskAvgValues( p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth )
-   call GeomWithoutSweepPitchTwist( p, u, x_hat_disk, m, thetaBladeNds, ErrStat, ErrMsg )
+   call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
    if (ErrStat >= AbortErrLev) return
 
       ! Local pitch + twist (aerodynamic + elastic) angle, rad
@@ -3632,7 +3632,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          Vstr = u%BladeMotion(k)%TranslationVel(1:3,j)
          Vwnd = m%DisturbedInflow(1:3,j,k) ! NOTE: contains tower shadow
          theta = m%DMST_u%PitchAndTwist(j,k) ! TODO
-         call LL_AeroOuts( m%WithoutSweepPitchTwist(1:3,1:3,j,k), u%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
+         call LL_AeroOuts( m%orientationAnnulus(1:3,1:3,j,k), u%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
                      theta, Vstr(1:3), Vind(1:3), Vwnd(1:3), p%KinVisc, p%DMST%chord(j,k), &                 ! inputs
                      AxInd, TanInd, Vrel, phi, alpha, Re, UrelWind_s(1:3), ErrStat2, ErrMsg2 )               ! outputs
             call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, 'SetOutputsFromDMST')
@@ -3663,8 +3663,8 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          m%Y(j,k) = force(2)
          m%M(j,k) = moment(3)
 
-         y%BladeLoad(k)%force(:,j)  = matmul( force,  m%WithoutSweepPitchTwist(:,:,j,k) )  ! force per unit length of the jth node on the kth blade
-         y%BladeLoad(k)%moment(:,j) = matmul( moment, m%WithoutSweepPitchTwist(:,:,j,k) )  ! moment per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%force(:,j)  = matmul( force,  m%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%moment(:,j) = matmul( moment, m%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node on the kth blade
 
          ! Save results for outputs so we don't have to recalculate them all when we write outputs
          m%blds(k)%BN_AxInd(j)           = AxInd
