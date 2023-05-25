@@ -3179,7 +3179,7 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    ! note ErrStat and ErrMsg are set in GeomWithoutSweepPitchTwist
 
       ! Get disk average values and orientations
-   call DiskAvgValues( p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth )
+   call DiskAvgValues( p, u, m, x_hat_disk )
    call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
    if (ErrStat >= AbortErrLev) return
 
@@ -3208,9 +3208,11 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    ! Azimuthal location of each blade, rad
    theta_b_tmp = EulerExtract( matmul(u%HubMotion%Orientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
    theta_b(1) = theta_b_tmp(1)
+   call Zero2TwoPi(theta_b(1))
    do k = 2,p%NumBlades
       theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%NumBlades*(k-1)
    end do
+   call Zero2TwoPi(theta_b(2))
 
    ! Range of azimuth angles within each streamtube
    do j = 1,p%NumBlNds

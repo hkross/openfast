@@ -97,7 +97,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   lgth = floor(2.0_ReKi/p%DMSTRes) + 1
+   lgth = floor(2.0_ReKi/p%DMSTRes)
    allocate ( p%indf(lgth), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%indf.', errStat, errMsg, RoutineName )
@@ -118,7 +118,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
          p%theta_st(j,i) = p%theta_st(j-p%Nst,i) + pi
       end do
       do j = 1,lgth
-         p%indf(j) = 0.0_ReKi + p%DMSTRes*(j - 1)
+         p%indf(j) = p%DMSTRes + p%DMSTRes*(j - 1)
       end do
    end do
 
@@ -464,9 +464,10 @@ subroutine calculate_CTmo( DMSTMod, indf, CTmo )
    
 end subroutine calculate_CTmo
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_CTbe( Vinf, indf, p, u, AFinfo, CTbe )
+subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
    ! This routine is called from DMST_CalcOutput and calculates the thrust coefficient from blade element theory.
    !..................................................................................................................................
+   integer(IntKi),                 intent(in   )                   :: m           ! Loops through sweeps
    real(ReKi),                     intent(in   )                   :: Vinf(:,:,:) ! Free-stream velocity
    real(ReKi),                     intent(in   )                   :: indf(:)     ! Array of induction factors
    type(DMST_ParameterType),       intent(in   )                   :: p           ! Parameters
@@ -486,23 +487,25 @@ subroutine calculate_CTbe( Vinf, indf, p, u, AFinfo, CTbe )
    integer(IntKi)                                                  :: i           ! Loops through induction factors
    integer(IntKi)                                                  :: j           ! Loops through streamtubes
    integer(IntKi)                                                  :: k           ! Loops through nodes
+   integer(IntKi)                                                  :: n           ! Index for theta_st
    character(ErrMsgLen)                                            :: errMsg2     ! Temporary error message if ErrStat /= ErrID_None
    integer(IntKi)                                                  :: errStat2    ! Temporary error status of the operation
    type(AFI_OutputType)                                            :: AFI_interp  ! Interpolated airfoil coefficients
 
    do k = 1,p%numBladeNodes
       do j = 1,p%Nst
+         n = j + (m-1)*(p%Nst)
          do i = 1,size(p%indf)
             V(i,j,k) = p%indf(i)*Vinf(1,j,k) ! free-stream minus induced velocity
             lambda(i,j,k) = u%omega*p%radius(k)/V(i,j,k) ! local tip-speed ratio
-            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0*lambda(i,j,k)*cos(p%theta_st(j,k)) + lambda(i,j,k)**2) ! relative velocity
+            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0*lambda(i,j,k)*cos(p%theta_st(n,k)) + lambda(i,j,k)**2) ! relative velocity
             Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
-            alpha(i,j,k) = atan2(sin(p%theta_st(j,k)),lambda(i,j,k) + cos(p%theta_st(j,k))) + u%pitch(k) ! angle of attack
-            call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
+            alpha(i,j,k) = atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) + u%pitch(k) ! angle of attack
+            call AFI_ComputeAirfoilCoefs( -alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
             phi(i,j,k) = alpha(i,j,k) - u%pitch(k) ! inflow angle
             Cn(i,j,k) = AFI_interp%Cd*sin(phi(i,j,k)) + AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
-            CTbe(i,j,k) = p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(j,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(j,k)) + Cn(i,j,k)*sin(p%theta_st(j,k))) ! thrust coefficient from blade element theory
+            CTbe(i,j,k) = p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(n,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k))) ! thrust coefficient from blade element theory
          end do
       end do
    end do
@@ -704,12 +707,15 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
    indf_final_u = 0.0
    indf_final_d = 0.0
    Vind_st = 0.0
+   CTmo = 0.0
+
+      ! Calculate the thrust coefficient from linear momentum theory
+   call calculate_CTmo( p%DMSTMod, p%indf, CTmo )
 
       ! Loop through upstream and downstream sweeps
    do m = 1,2
 
          ! Initialize some local values
-      CTmo = 0.0
       CTbe = 0.0
       CTdiff = 0.0
       crossPts = 0
@@ -719,32 +725,27 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
       indf_prev = 0.0
       Vinf = 0.0
 
-         ! Calculate the thrust coefficient from linear momentum theory
-      call calculate_CTmo( p%DMSTMod, p%indf, CTmo )
-
       if ( m == 1_IntKi ) then
          Vinf = u%Vinf
       else if ( m == 2_IntKi ) then
          do k = 1,p%numBladeNodes
             do j = 1,p%Nst
                if ( p%DMSTMod == 1 ) then
-                  Vinf(1,j,k) = (2.0_ReKi*indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
+                  Vinf(1,j,k) = (2.0_ReKi*indf_final_u(p%Nst-j+1,k) - 1.0_ReKi)*u%Vinf(1,p%Nst-j+1,k)
                else if ( p%DMSTMod == 2 ) then
-                  Vinf(1,j,k) = indf_final_u(j,k)/(2.0 - indf_final_u(j,k))*u%Vinf(1,j,k)
+                  Vinf(1,j,k) = indf_final_u(p%Nst-j+1,k)/(2.0 - indf_final_u(p%Nst-j+1,k))*u%Vinf(1,p%Nst-j+1,k)
                end if
             end do 
          end do
       end if 
 
          ! Calculate the thrust coefficient from blade element theory
-      call calculate_CTbe( Vinf, p%indf, p, u, AFInfo, CTbe )
+      call calculate_CTbe( m, Vinf, p%indf, p, u, AFInfo, CTbe )
 
          ! Calculate the difference between CTbe and CTmo
       do k = 1,p%numBladeNodes
          do j = 1,p%Nst
-            do i = 1,size(p%indf)
-               CTdiff(i,j,k) = CTbe(i,j,k) - CTmo(i)
-            end do
+            CTdiff(:,j,k) = CTbe(:,j,k) - CTmo
          end do
       end do
 
@@ -799,14 +800,14 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(j-p%Nst,k) + 1.0_ReKi)*u%Vinf(1,j-p%Nst,k)
+            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(2*p%Nst-j+1,k) + 1.0_ReKi)*u%Vinf(1,2*p%Nst-j+1,k)
          end do
       else if ( p%DMSTMod == 2 ) then
          do j = 1,p%Nst
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (indf_final_u(j-p%Nst,k)*indf_final_d(j-p%Nst,k) - indf_final_u(j-p%Nst,k))/(2.0 - indf_final_u(j-p%Nst,k))*u%Vinf(1,j-p%Nst,k)
+            Vind_st(1,j,k) = (indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))/(2.0 - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k)
          end do
       end if
    end do
