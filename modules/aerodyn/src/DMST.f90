@@ -118,7 +118,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
          p%theta_st(j,i) = p%theta_st(j-p%Nst,i) + pi
       end do
       do j = 1,lgth
-         p%indf(j) = p%DMSTRes + p%DMSTRes*(j - 1)
+         p%indf(j) = p%DMSTRes + p%DMSTRes*(j-1)
       end do
    end do
 
@@ -447,17 +447,17 @@ subroutine calculate_CTmo( DMSTMod, indf, CTmo )
    if ( DMSTMod == 1 ) then
       do i = 1,size(indf)
          if ( indf(i) < 0.6_ReKi ) then
-            CTmo(i) = 0.889 - ((0.0203 - (0.857 - indf(i))**2)/0.6427) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
+            CTmo(i) = 0.889_ReKi - ((0.0203_ReKi - (0.857_ReKi - indf(i))**2)/0.6427_ReKi) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
          else if ( indf(i) >= 0.6_ReKi ) then
-            CTmo(i) = 4.0*indf(i)*(1.0 - indf(i)) ! thrust coefficient from linear momentum theory (classic)
+            CTmo(i) = 4.0_ReKi*indf(i)*(1.0_ReKi - indf(i)) ! thrust coefficient from linear momentum theory (classic)
          end if
       end do
    else if ( DMSTMod == 2 ) then
       do i = 1,size(indf)
          if ( indf(i) < 0.3_ReKi ) then
-            CTmo(i) = 0.889 - ((0.0203 - (0.857 - indf(i))**2)/0.6427) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
+            CTmo(i) = 0.889_ReKi - ((0.0203_ReKi - (0.857_ReKi - indf(i))**2)/0.6427_ReKi) ! thrust coefficient from linear momentum theory (Glauert's empirical correction)
          else if ( indf(i) >= 0.3_ReKi ) then
-            CTmo(i) = 4/3*(1.0 - indf(i))*(2.0 + indf(i))/(2.0 - indf(i)) ! thrust coefficient from linear momentum theory (high load)
+            CTmo(i) = 4.0_ReKi/3.0_ReKi*(1.0_ReKi - indf(i))*(2.0_ReKi + indf(i))/(2.0_ReKi - indf(i)) ! thrust coefficient from linear momentum theory (high load)
          end if
       end do
    end if
@@ -498,14 +498,14 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
          do i = 1,size(p%indf)
             V(i,j,k) = p%indf(i)*Vinf(1,j,k) ! free-stream minus induced velocity
             lambda(i,j,k) = u%omega*p%radius(k)/V(i,j,k) ! local tip-speed ratio
-            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0*lambda(i,j,k)*cos(p%theta_st(n,k)) + lambda(i,j,k)**2) ! relative velocity
+            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0_ReKi*lambda(i,j,k)*cos(p%theta_st(n,k)) + lambda(i,j,k)**2) ! relative velocity
             Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
-            alpha(i,j,k) = atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) + u%pitch(k) ! angle of attack
-            call AFI_ComputeAirfoilCoefs( -alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
+            alpha(i,j,k) = -atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) + u%pitch(k) ! angle of attack
+            call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
             phi(i,j,k) = alpha(i,j,k) - u%pitch(k) ! inflow angle
-            Cn(i,j,k) = AFI_interp%Cd*sin(phi(i,j,k)) + AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
+            Cn(i,j,k) = -AFI_interp%Cd*sin(phi(i,j,k)) - AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
-            CTbe(i,j,k) = p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(n,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k))) ! thrust coefficient from blade element theory
+            CTbe(i,j,k) = 2.0_ReKi*p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(n,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k))) ! thrust coefficient from blade element theory
          end do
       end do
    end do
@@ -602,10 +602,10 @@ subroutine DMST_QuadSolve_Glauert( tol, CTfinal, indf, indf_plus, indf_tmp )
    real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
    real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
 
-   discriminant = 2.6669**2 - 4.0*1.5559*(2.0001 - CTfinal)
+   discriminant = 2.6669_ReKi**2 - 4.0_ReKi*1.5559_ReKi*(2.0001_ReKi - CTfinal)
    if ( discriminant >= 0.0_ReKi ) then
-      indf_tmp1 = (2.6669 + sqrt(discriminant))/(2.0*1.5559)
-      indf_tmp2 = (2.6669 - sqrt(discriminant))/(2.0*1.5559)
+      indf_tmp1 = (2.6669_ReKi + sqrt(discriminant))/(2.0_ReKi*1.5559_ReKi)
+      indf_tmp2 = (2.6669_ReKi - sqrt(discriminant))/(2.0_ReKi*1.5559_ReKi)
       if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
          indf_tmp = indf_tmp1
       else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
@@ -629,10 +629,10 @@ subroutine DMST_QuadSolve_Theoretical( tol, CTfinal, indf, indf_plus, indf_tmp )
    real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
    real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
 
-   discriminant = 4.0**2 - 4.0*4.0*CTfinal
+   discriminant = 4.0_ReKi**2 - 4.0_ReKi*4.0_ReKi*CTfinal
    if ( discriminant >= 0.0_ReKi ) then
-      indf_tmp1 = (4.0 + sqrt(discriminant))/(2*4.0)
-      indf_tmp2 = (4.0 - sqrt(discriminant))/(2*4.0)
+      indf_tmp1 = (4.0_ReKi + sqrt(discriminant))/(2.0_ReKi*4.0_ReKi)
+      indf_tmp2 = (4.0_ReKi - sqrt(discriminant))/(2.0_ReKi*4.0_ReKi)
       if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
          indf_tmp = indf_tmp1
       else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
@@ -656,10 +656,10 @@ subroutine DMST_QuadSolve_HighLoad( tol, CTfinal, indf, indf_plus, indf_tmp )
       real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
       real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
    
-      discriminant = (1.0 - 3/4*CTfinal)**2 - 4.0*1.0*(3/2*CTfinal - 2.0)
+      discriminant = (1.0_ReKi - 3.0_ReKi/4.0_ReKi*CTfinal)**2 - 4.0_ReKi*1.0_ReKi*(3.0_ReKi/2.0_ReKi*CTfinal - 2.0_ReKi)
       if ( discriminant >= 0.0_ReKi ) then
-         indf_tmp1 = (3/4*CTfinal - 1.0 + sqrt(discriminant))/(2.0)
-         indf_tmp2 = (3/4*CTfinal - 1.0 - sqrt(discriminant))/(2.0)
+         indf_tmp1 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi + sqrt(discriminant))/(2.0_ReKi)
+         indf_tmp2 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi - sqrt(discriminant))/(2.0_ReKi)
          if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
             indf_tmp = indf_tmp1
          else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
@@ -733,7 +733,7 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
                if ( p%DMSTMod == 1 ) then
                   Vinf(1,j,k) = (2.0_ReKi*indf_final_u(p%Nst-j+1,k) - 1.0_ReKi)*u%Vinf(1,p%Nst-j+1,k)
                else if ( p%DMSTMod == 2 ) then
-                  Vinf(1,j,k) = indf_final_u(p%Nst-j+1,k)/(2.0 - indf_final_u(p%Nst-j+1,k))*u%Vinf(1,p%Nst-j+1,k)
+                  Vinf(1,j,k) = indf_final_u(p%Nst-j+1,k)/(2.0_ReKi - indf_final_u(p%Nst-j+1,k))*u%Vinf(1,p%Nst-j+1,k)
                end if
             end do 
          end do
@@ -800,14 +800,14 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2*indf_final_u(2*p%Nst-j+1,k) + 1.0_ReKi)*u%Vinf(1,2*p%Nst-j+1,k)
+            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2.0_ReKi*indf_final_u(2*p%Nst-j+1,k) + 1.0_ReKi)*u%Vinf(1,2*p%Nst-j+1,k)
          end do
       else if ( p%DMSTMod == 2 ) then
          do j = 1,p%Nst
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))/(2.0 - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k)
+            Vind_st(1,j,k) = (indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))/(2.0_ReKi - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k)
          end do
       end if
    end do
