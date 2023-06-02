@@ -3211,8 +3211,8 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    call Zero2TwoPi(theta_b(1))
    do k = 2,p%NumBlades
       theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%NumBlades*(k-1)
+      call Zero2TwoPi(theta_b(k))
    end do
-   call Zero2TwoPi(theta_b(2))
 
    ! Range of azimuth angles within each streamtube
    do j = 1,p%NumBlNds
