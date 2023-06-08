@@ -97,7 +97,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   lgth = floor(2.0_ReKi/p%DMSTRes)
+   lgth = floor(1.0_ReKi/p%DMSTRes)
    allocate ( p%indf(lgth), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%indf.', errStat, errMsg, RoutineName )
@@ -505,7 +505,7 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
             phi(i,j,k) = alpha(i,j,k) - u%pitch(k) ! inflow angle
             Cn(i,j,k) = -AFI_interp%Cd*sin(phi(i,j,k)) - AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
-            CTbe(i,j,k) = 2.0_ReKi*p%numBlades*p%chord(k,1)*Vrel(i,j,k)**2/(pi*p%radius(k)*sin(p%theta_st(n,k))*Vinf(1,j,k)**2)*(Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k))) ! thrust coefficient from blade element theory
+            CTbe(i,j,k) = Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k)) ! thrust coefficient from blade element theory
          end do
       end do
    end do
