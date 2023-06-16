@@ -800,14 +800,14 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - 2.0_ReKi*indf_final_u(2*p%Nst-j+1,k) + 1.0_ReKi)*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
+            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
          end do
       else if ( p%DMSTMod == 2 ) then
          do j = 1,p%Nst
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
          end do
          do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))/(2.0_ReKi - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
+            Vind_st(1,j,k) = (indf_final_d(j-p%Nst,k)/(2.0_ReKi - indf_final_u(2*p%Nst-j+1,k)) - 1.0_ReKi)*indf_final_u(2*p%Nst-j+1,k)*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
          end do
       end if
    end do
