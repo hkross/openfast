@@ -3161,11 +3161,6 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
    ! local variables
-   real(R8Ki)                              :: x_hat_disk(3)
-   real(R8Ki)                              :: y_hat_disk(3)
-   real(R8Ki)                              :: z_hat_disk(3)
-   real(R8Ki)                              :: thetaBladeNds(p%NumBlNds,p%NumBlades)
-   real(R8Ki)                              :: Azimuth(p%NumBlades)
    real(R8Ki)                              :: tmp1(3)
    real(R8Ki)                              :: tmp2(3)
    real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
@@ -3175,18 +3170,10 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    integer(intKi)                          :: j                                            ! Loop counter for nodes
    integer(intKi)                          :: k                                            ! Loop counter for blades
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
-   
-   ! note ErrStat and ErrMsg are set in GeomWithoutSweepPitchTwist
 
       ! Get disk average values and orientations
-   call DiskAvgValues( p, u, m, x_hat_disk )
-   call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
-   if (ErrStat >= AbortErrLev) return
-
-      ! Local pitch + twist (aerodynamic + elastic) angle, rad
-   do k=1,p%NumBlades
-      m%DMST_u%PitchAndTwist(:,k) = thetaBladeNds(:,k)
-   end do
+   call Calculate_MeshOrientation_LiftingLine( p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
+      if (ErrStat >= AbortErrLev) return
       
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
@@ -3613,8 +3600,8 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    ! Local variables stored in misc for nodal outputs
    real(ReKi)                               :: AxInd, TanInd, Vrel, phi, alpha, Re
    type(AFI_OutputType)                     :: AFI_interp     ! Resulting values from lookup table
-   real(ReKi)                               :: UrelWind_s(3)  ! Relative wind (wind+str) in section coordinates
-   real(ReKi)                               :: Cx, Cy
+   real(ReKi)                               :: UrelWind_s(3)
+   real(ReKi)                               :: Cn, Ct
    real(ReKi)                               :: Cl_static, Cd_static, Cm_static
    real(ReKi)                               :: Cl_dyn, Cd_dyn, Cm_dyn
    integer(intKi)                           :: ErrStat2
@@ -3623,17 +3610,18 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    ErrStat = 0
    ErrMsg = ""
 
+   theta = 0.0_ReKi
+
    ! Zero forces
    force(3)    =  0.0_ReKi
    moment(1:2) =  0.0_ReKi
 
    do k=1,p%numBlades
       do j=1,p%NumBlNds
-         ! --- Compute main aero variables from induction - set local variables
+         ! Compute main aero variables from induction - set local variables
          Vind = m%DMST_y%Vind(1:3,j,k)
          Vstr = u%BladeMotion(k)%TranslationVel(1:3,j)
-         Vwnd = m%DisturbedInflow(1:3,j,k) ! NOTE: contains tower shadow
-         theta = m%DMST_u%PitchAndTwist(j,k) ! TODO
+         Vwnd = m%DisturbedInflow(1:3,j,k) ! contains tower shadow
          call LL_AeroOuts( m%orientationAnnulus(1:3,1:3,j,k), u%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
                      theta, Vstr(1:3), Vind(1:3), Vwnd(1:3), p%KinVisc, p%DMST%chord(j,k), &                 ! inputs
                      AxInd, TanInd, Vrel, phi, alpha, Re, UrelWind_s(1:3), ErrStat2, ErrMsg2 )               ! outputs
@@ -3650,23 +3638,20 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          Cd_dyn    = AFI_interp%Cd
          Cm_dyn    = AFI_interp%Cm
             
+         phi = alpha - m%DMST_u%pitch(j)
+
          cp = cos(phi)
          sp = sin(phi)
-         Cx = Cl_dyn*cp + Cd_dyn*sp
-         Cy = Cl_dyn*sp - Cd_dyn*cp
+         Cn = Cl_dyn*cp + Cd_dyn*sp ! n going outwards radially
+         Ct = Cd_dyn*cp - Cl_dyn*sp ! t going towards the TE
 
-         q = 0.5 * p%airDens * Vrel**2                 ! dynamic pressure of the jth node on the kth blade
-         force(1) =  Cx * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to plane, not chord) of the jth node on the kth blade
-         force(2) = -Cy * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to plane, not chord) of the jth node on the kth blade
-         moment(3)=  Cm_dyn * q * p%DMST%chord(j,k)**2 ! pitching moment per unit length of the jth node on the kth blade
+         q = 0.5 * p%airDens * Vrel**2
+         force(1)  = Cn * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to chord) of the jth node on the kth blade
+         force(2)  = Ct * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to chord) of the jth node on the kth blade
+         moment(3) = Cm_dyn * q * p%DMST%chord(j,k)**2 ! pitching moment per unit length of the jth node on the kth blade
 
-            ! save these values for possible output later:
-         m%X(j,k) = force(1)
-         m%Y(j,k) = force(2)
-         m%M(j,k) = moment(3)
-
-         y%BladeLoad(k)%force(:,j)  = matmul( force,  m%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node on the kth blade
-         y%BladeLoad(k)%moment(:,j) = matmul( moment, m%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%force(:,j)  = matmul( transpose(m%orientationAnnulus(:,:,j,k)), force )  ! force per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%moment(:,j) = matmul( transpose(m%orientationAnnulus(:,:,j,k)), moment )  ! moment per unit length of the jth node on the kth blade
 
          ! Save results for outputs so we don't have to recalculate them all when we write outputs
          m%blds(k)%BN_AxInd(j)           = AxInd
@@ -3682,8 +3667,6 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          m%blds(k)%BN_Cl(j)              = Cl_dyn
          m%blds(k)%BN_Cd(j)              = Cd_dyn
          m%blds(k)%BN_Cm(j)              = Cm_dyn
-         m%blds(k)%BN_Cx(j)              = Cx
-         m%blds(k)%BN_Cy(j)              = Cy
       end do !j=nodes
    end do !k=blades
    
