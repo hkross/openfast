@@ -2529,11 +2529,11 @@ subroutine SetInputs(p, p_AD, u, m, indx, errStat, errMsg)
 
    if (p_AD%WakeMod /= WakeMod_FVW .and. p_AD%WakeMod /= WakeMod_DMST) then
          ! This needs to extract the inputs from the AD data types (mesh) and massage them for the BEMT module
-      call SetInputsForBEMT(p, u, m, indx, errStat2, errMsg2)
+      call SetInputsForBEMT(p_AD, p, u, m, indx, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    elseif (p_AD%WakeMod == WakeMod_DMST) then
          ! This needs to extract the inputs from the AD data types (mesh) and massage them for the DMST module
-      call SetInputsForDMST(p, u, m, errStat2, errMsg2)
+      call SetInputsForDMST(p_AD, p, u, m, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    endif
 
@@ -2578,8 +2578,9 @@ end subroutine SetDisturbedInflow
 
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%BEMT_u(indx).
-subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
+subroutine SetInputsForBEMT(p_AD, p, u, m, indx, errStat, errMsg)
 
+   type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD Inputs at Time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
@@ -2621,7 +2622,7 @@ subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
    ErrMsg  = ""
 
       ! Get disk average values and orientations
-   call DiskAvgValues(p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth) ! also sets m%V_diskAvg, m%V_dot_x
+   call DiskAvgValues(p_AD, p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth) ! also sets m%V_diskAvg, m%V_dot_x
 
    ! Velocity in disk normal
    m%BEMT_u(indx)%V0 = m%AvgDiskVelDist    ! Note: used for SkewWake Cont
@@ -2759,7 +2760,7 @@ subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
       if (p%AeroProjMod==APM_BEM_NoSweepPitchTwist) then
          call Calculate_MeshOrientation_NoSweepPitchTwist(p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg, thetaBladeNds=thetaBladeNds)
       else
-         call Calculate_MeshOrientation_LiftingLine(p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg, thetaBladeNds=thetaBladeNds)
+         call Calculate_MeshOrientation_LiftingLine(p_AD, p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg, thetaBladeNds=thetaBladeNds)
       endif
 
       ! local radius (normalized distance from rotor centerline)
@@ -2893,7 +2894,8 @@ subroutine SetInputsForBEMT(p, u, m, indx, errStat, errMsg)
          
 end subroutine SetInputsForBEMT
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine DiskAvgValues(p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth)
+subroutine DiskAvgValues(p_AD, p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth)
+   type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD Inputs at Time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
@@ -2936,7 +2938,11 @@ subroutine DiskAvgValues(p, u, m, x_hat_disk, y_hat_disk, z_hat_disk, Azimuth)
       ! orientation vectors:
    x_hat_disk = u%HubMotion%Orientation(1,:,1) !actually also x_hat_hub
 
-   m%V_dot_x  = dot_product( m%V_diskAvg, x_hat_disk )
+   if ( p_AD%WakeMod == WakeMod_DMST ) then
+      m%V_dot_x = sqrt( dot_product( m%V_diskAvg, u%HubMotion%Orientation(2,:,1) )**2 + dot_product( m%V_diskAvg, u%HubMotion%Orientation(3,:,1) )**2 )
+   else
+      m%V_dot_x  = dot_product( m%V_diskAvg, x_hat_disk )
+   end if
    
    
    ! These values are not used in the Envision code base; stored here only for easier merging from OpenFAST:
@@ -3117,7 +3123,8 @@ subroutine Calculate_MeshOrientation_NoSweepPitchTwist(p, u, m, thetaBladeNds, t
    end do !k=blades
 end subroutine Calculate_MeshOrientation_NoSweepPitchTwist
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, thetaBladeNds, toeBladeNds, ErrStat, ErrMsg)
+subroutine Calculate_MeshOrientation_LiftingLine(p_AD, p, u, m, thetaBladeNds, toeBladeNds, ErrStat, ErrMsg)
+   type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD Inputs at Time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
@@ -3125,6 +3132,8 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, thetaBladeNds, toeBlad
    real(R8Ki), optional,    intent(  out)  :: toeBladeNds(p%NumBlNds,p%NumBlades)
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
+   real(R8Ki)                              :: tmp1(3)
+   real(R8Ki)                              :: tmp2(3)
    real(R8Ki)                              :: theta(3)
    real(R8Ki)                              :: orientation(3,3)
    integer(intKi)                          :: j                      ! loop counter for nodes
@@ -3140,20 +3149,31 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, thetaBladeNds, toeBlad
          m%orientationAnnulus(:,:,j,k) = u%BladeMotion(k)%Orientation(:,:,j)
       enddo
    
-      do j=1,p%NumBlNds
-         orientation = matmul( u%BladeMotion(k)%Orientation(:,:,j), transpose( m%orientationAnnulus(:,:,j,k) ) )
-         theta = EulerExtract( orientation )
-         m%Curve(      j,k) =  theta(2) ! TODO
-         if (present(thetaBladeNds)) thetaBladeNds(j,k) = -theta(3)
-         if (present(toeBladeNds  )) toeBladeNds(  j,k) =  theta(1)
-      enddo
+      if ( p_AD%WakeMod == WakeMod_DMST ) then
+         tmp1 = EulerExtract( matmul(u%BladeRootMotion(1)%RefOrientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
+         do j=1,p%NumBlNds      
+            tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
+            m%DMST_u%PitchAndTwist(j,k) = tmp2(1) - tmp1(1)
+            if (present(toeBladeNds)) toeBladeNds(j,k) = 0.0_ReKi ! TODO
+            m%Curve(j,k) = 0.0_ReKi ! TODO
+         end do
+      else
+         do j=1,p%NumBlNds
+            orientation = matmul( u%BladeMotion(k)%Orientation(:,:,j), transpose( m%orientationAnnulus(:,:,j,k) ) )
+            theta = EulerExtract( orientation )
+            m%Curve(      j,k) =  theta(2) ! TODO
+            if (present(thetaBladeNds)) thetaBladeNds(j,k) = -theta(3)
+            if (present(toeBladeNds  )) toeBladeNds(  j,k) =  theta(1)
+         enddo
+      end if
    end do !k=blades
       
 end subroutine Calculate_MeshOrientation_LiftingLine
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%DMST_u.
-subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
+subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
 
+   type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
@@ -3161,8 +3181,7 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
    ! local variables
-   real(R8Ki)                              :: tmp1(3)
-   real(R8Ki)                              :: tmp2(3)
+   real(R8Ki)                              :: x_hat_disk(3)
    real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
    real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
    real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
@@ -3172,8 +3191,9 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
 
       ! Get disk average values and orientations
-   call Calculate_MeshOrientation_LiftingLine( p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
-      if (ErrStat >= AbortErrLev) return
+   call DiskAvgValues( p_AD, p, u, m, x_hat_disk )
+   call Calculate_MeshOrientation_LiftingLine( p_AD, p, u, m, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
+   if (ErrStat >= AbortErrLev) return
       
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
@@ -3185,13 +3205,6 @@ subroutine SetInputsForDMST(p, u, m, errStat, errMsg)
       ! Rotor angular velocity, rad/s
    m%DMST_u%omega = dot_product( u%HubMotion%Orientation(1,1:3,1), u%HubMotion%RotationVel(:,1) )
    
-      ! Blade pitch angle, rad
-   tmp1 = EulerExtract( matmul(u%BladeRootMotion(1)%RefOrientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
-   do j=1,p%NumBlNds      
-      tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
-      m%DMST_u%pitch(j) = tmp2(1) - tmp1(1)
-   end do
-
    ! Azimuthal location of each blade, rad
    theta_b_tmp = EulerExtract( matmul(u%HubMotion%Orientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
    theta_b(1) = theta_b_tmp(1)
@@ -3252,11 +3265,11 @@ subroutine SetInputsForFVW(p, u, m, errStat, errMsg)
          allocate(thetaBladeNds(p%rotors(iR)%NumBlNds, p%rotors(iR)%NumBlades))
          ! Get disk average values and orientations
          ! NOTE: needed because it sets m%V_diskAvg and m%V_dot_x, needed by CalcOutput..
-         call DiskAvgValues(p%rotors(iR), u(tIndx)%rotors(iR), m%rotors(iR), x_hat_disk) ! also sets m%V_diskAvg and m%V_dot_x
+         call DiskAvgValues(p, p%rotors(iR), u(tIndx)%rotors(iR), m%rotors(iR), x_hat_disk) ! also sets m%V_diskAvg and m%V_dot_x
          if (p%rotors(iR)%AeroProjMod==APM_BEM_NoSweepPitchTwist) then
             call Calculate_MeshOrientation_NoSweepPitchTwist(p%rotors(iR),u(tIndx)%rotors(iR),  m%rotors(iR), thetaBladeNds,ErrStat=ErrStat2,ErrMsg=ErrMsg2) ! sets m%orientationAnnulus, m%Curve
          else if (p%rotors(iR)%AeroProjMod==APM_LiftingLine) then
-            call Calculate_MeshOrientation_LiftingLine      (p%rotors(iR),u(tIndx)%rotors(iR), m%rotors(iR), thetaBladeNds,ErrStat=ErrStat2,ErrMsg=ErrMsg2) ! sets m%orientationAnnulus, m%Curve
+            call Calculate_MeshOrientation_LiftingLine      (p, p%rotors(iR),u(tIndx)%rotors(iR), m%rotors(iR), thetaBladeNds,ErrStat=ErrStat2,ErrMsg=ErrMsg2) ! sets m%orientationAnnulus, m%Curve
          endif
          call StorePitchAndAzimuth(p%rotors(iR), u(tIndx)%rotors(iR), m%rotors(iR), ErrStat2, ErrMsg2)
          call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
@@ -3610,8 +3623,6 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    ErrStat = 0
    ErrMsg = ""
 
-   theta = 0.0_ReKi
-
    ! Zero forces
    force(3)    =  0.0_ReKi
    moment(1:2) =  0.0_ReKi
@@ -3622,6 +3633,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          Vind = m%DMST_y%Vind(1:3,j,k)
          Vstr = u%BladeMotion(k)%TranslationVel(1:3,j)
          Vwnd = m%DisturbedInflow(1:3,j,k) ! contains tower shadow
+         theta = m%DMST_u%PitchAndTwist(j,k)
          call LL_AeroOuts( m%orientationAnnulus(1:3,1:3,j,k), u%BladeMotion(k)%Orientation(1:3,1:3,j), & ! inputs
                      theta, Vstr(1:3), Vind(1:3), Vwnd(1:3), p%KinVisc, p%DMST%chord(j,k), &                 ! inputs
                      AxInd, TanInd, Vrel, phi, alpha, Re, UrelWind_s(1:3), ErrStat2, ErrMsg2 )               ! outputs
@@ -3638,7 +3650,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          Cd_dyn    = AFI_interp%Cd
          Cm_dyn    = AFI_interp%Cm
             
-         phi = alpha - m%DMST_u%pitch(j)
+         phi = alpha - m%DMST_u%PitchAndTwist(j,k)
 
          cp = cos(phi)
          sp = sin(phi)
@@ -3649,6 +3661,10 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          force(1)  = Cn * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to chord) of the jth node on the kth blade
          force(2)  = Ct * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to chord) of the jth node on the kth blade
          moment(3) = Cm_dyn * q * p%DMST%chord(j,k)**2 ! pitching moment per unit length of the jth node on the kth blade
+
+         m%X(j,k) = force(1)
+         m%Y(j,k) = force(2)
+         m%M(j,k) = moment(3)
 
          y%BladeLoad(k)%force(:,j)  = matmul( transpose(m%orientationAnnulus(:,:,j,k)), force )  ! force per unit length of the jth node on the kth blade
          y%BladeLoad(k)%moment(:,j) = matmul( transpose(m%orientationAnnulus(:,:,j,k)), moment )  ! moment per unit length of the jth node on the kth blade

@@ -75,8 +75,7 @@ IMPLICIT NONE
   TYPE, PUBLIC :: DMST_InputType
     REAL(ReKi)  :: omega      !< Rotor angular velocity [rad/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vinf      !< Free-stream velocity [m/s]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: pitch      !< Blade pitch angle [rad]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAndTwist      !< Local pitch + twist (aerodynamic + elastic) angle [rad]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAndTwist      !< Local pitch + twist angle [rad]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_st      !< Streamtube corresponding to each blade node [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: UserProp      !< Optional user property for interpolating airfoils (per element per blade) [-]
   END TYPE DMST_InputType
@@ -1242,18 +1241,6 @@ IF (ALLOCATED(SrcInputData%Vinf)) THEN
   END IF
     DstInputData%Vinf = SrcInputData%Vinf
 ENDIF
-IF (ALLOCATED(SrcInputData%pitch)) THEN
-  i1_l = LBOUND(SrcInputData%pitch,1)
-  i1_u = UBOUND(SrcInputData%pitch,1)
-  IF (.NOT. ALLOCATED(DstInputData%pitch)) THEN 
-    ALLOCATE(DstInputData%pitch(i1_l:i1_u),STAT=ErrStat2)
-    IF (ErrStat2 /= 0) THEN 
-      CALL SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%pitch.', ErrStat, ErrMsg,RoutineName)
-      RETURN
-    END IF
-  END IF
-    DstInputData%pitch = SrcInputData%pitch
-ENDIF
 IF (ALLOCATED(SrcInputData%PitchAndTwist)) THEN
   i1_l = LBOUND(SrcInputData%PitchAndTwist,1)
   i1_u = UBOUND(SrcInputData%PitchAndTwist,1)
@@ -1322,9 +1309,6 @@ ENDIF
 IF (ALLOCATED(InputData%Vinf)) THEN
   DEALLOCATE(InputData%Vinf)
 ENDIF
-IF (ALLOCATED(InputData%pitch)) THEN
-  DEALLOCATE(InputData%pitch)
-ENDIF
 IF (ALLOCATED(InputData%PitchAndTwist)) THEN
   DEALLOCATE(InputData%PitchAndTwist)
 ENDIF
@@ -1376,11 +1360,6 @@ ENDIF
   IF ( ALLOCATED(InData%Vinf) ) THEN
     Int_BufSz   = Int_BufSz   + 2*3  ! Vinf upper/lower bounds for each dimension
       Re_BufSz   = Re_BufSz   + SIZE(InData%Vinf)  ! Vinf
-  END IF
-  Int_BufSz   = Int_BufSz   + 1     ! pitch allocated yes/no
-  IF ( ALLOCATED(InData%pitch) ) THEN
-    Int_BufSz   = Int_BufSz   + 2*1  ! pitch upper/lower bounds for each dimension
-      Re_BufSz   = Re_BufSz   + SIZE(InData%pitch)  ! pitch
   END IF
   Int_BufSz   = Int_BufSz   + 1     ! PitchAndTwist allocated yes/no
   IF ( ALLOCATED(InData%PitchAndTwist) ) THEN
@@ -1449,21 +1428,6 @@ ENDIF
             Re_Xferred = Re_Xferred + 1
           END DO
         END DO
-      END DO
-  END IF
-  IF ( .NOT. ALLOCATED(InData%pitch) ) THEN
-    IntKiBuf( Int_Xferred ) = 0
-    Int_Xferred = Int_Xferred + 1
-  ELSE
-    IntKiBuf( Int_Xferred ) = 1
-    Int_Xferred = Int_Xferred + 1
-    IntKiBuf( Int_Xferred    ) = LBOUND(InData%pitch,1)
-    IntKiBuf( Int_Xferred + 1) = UBOUND(InData%pitch,1)
-    Int_Xferred = Int_Xferred + 2
-
-      DO i1 = LBOUND(InData%pitch,1), UBOUND(InData%pitch,1)
-        ReKiBuf(Re_Xferred) = InData%pitch(i1)
-        Re_Xferred = Re_Xferred + 1
       END DO
   END IF
   IF ( .NOT. ALLOCATED(InData%PitchAndTwist) ) THEN
@@ -1585,24 +1549,6 @@ ENDIF
             Re_Xferred = Re_Xferred + 1
           END DO
         END DO
-      END DO
-  END IF
-  IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! pitch not allocated
-    Int_Xferred = Int_Xferred + 1
-  ELSE
-    Int_Xferred = Int_Xferred + 1
-    i1_l = IntKiBuf( Int_Xferred    )
-    i1_u = IntKiBuf( Int_Xferred + 1)
-    Int_Xferred = Int_Xferred + 2
-    IF (ALLOCATED(OutData%pitch)) DEALLOCATE(OutData%pitch)
-    ALLOCATE(OutData%pitch(i1_l:i1_u),STAT=ErrStat2)
-    IF (ErrStat2 /= 0) THEN 
-       CALL SetErrStat(ErrID_Fatal, 'Error allocating OutData%pitch.', ErrStat, ErrMsg,RoutineName)
-       RETURN
-    END IF
-      DO i1 = LBOUND(OutData%pitch,1), UBOUND(OutData%pitch,1)
-        OutData%pitch(i1) = ReKiBuf(Re_Xferred)
-        Re_Xferred = Re_Xferred + 1
       END DO
   END IF
   IF ( IntKiBuf( Int_Xferred ) == 0 ) THEN  ! PitchAndTwist not allocated
@@ -2001,12 +1947,6 @@ IF (ALLOCATED(u_out%Vinf) .AND. ALLOCATED(u1%Vinf)) THEN
     END DO
   END DO
 END IF ! check if allocated
-IF (ALLOCATED(u_out%pitch) .AND. ALLOCATED(u1%pitch)) THEN
-  DO i1 = LBOUND(u_out%pitch,1),UBOUND(u_out%pitch,1)
-    b = -(u1%pitch(i1) - u2%pitch(i1))
-    u_out%pitch(i1) = u1%pitch(i1) + b * ScaleFactor
-  END DO
-END IF ! check if allocated
 IF (ALLOCATED(u_out%PitchAndTwist) .AND. ALLOCATED(u1%PitchAndTwist)) THEN
   DO i2 = LBOUND(u_out%PitchAndTwist,2),UBOUND(u_out%PitchAndTwist,2)
     DO i1 = LBOUND(u_out%PitchAndTwist,1),UBOUND(u_out%PitchAndTwist,1)
@@ -2098,13 +2038,6 @@ IF (ALLOCATED(u_out%Vinf) .AND. ALLOCATED(u1%Vinf)) THEN
         u_out%Vinf(i1,i2,i3) = u1%Vinf(i1,i2,i3) + b  + c * t_out
       END DO
     END DO
-  END DO
-END IF ! check if allocated
-IF (ALLOCATED(u_out%pitch) .AND. ALLOCATED(u1%pitch)) THEN
-  DO i1 = LBOUND(u_out%pitch,1),UBOUND(u_out%pitch,1)
-    b = (t(3)**2*(u1%pitch(i1) - u2%pitch(i1)) + t(2)**2*(-u1%pitch(i1) + u3%pitch(i1)))* scaleFactor
-    c = ( (t(2)-t(3))*u1%pitch(i1) + t(3)*u2%pitch(i1) - t(2)*u3%pitch(i1) ) * scaleFactor
-    u_out%pitch(i1) = u1%pitch(i1) + b  + c * t_out
   END DO
 END IF ! check if allocated
 IF (ALLOCATED(u_out%PitchAndTwist) .AND. ALLOCATED(u1%PitchAndTwist)) THEN

@@ -153,13 +153,6 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
       return
    end if 
    u%Vinf = 0.0_ReKi
-   
-   allocate ( u%pitch(p%numBladeNodes), STAT = errStat2 )
-   if ( errStat2 /= 0 ) then
-      call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%pitch.', errStat, errMsg, RoutineName )
-      return
-   end if 
-   u%pitch = 0.0_ReKi
 
    allocate ( u%blade_st(p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
@@ -500,9 +493,9 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
             lambda(i,j,k) = u%omega*p%radius(k)/V(i,j,k) ! local tip-speed ratio
             Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0_ReKi*lambda(i,j,k)*cos(p%theta_st(n,k)) + lambda(i,j,k)**2) ! relative velocity
             Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
-            alpha(i,j,k) = -atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) + u%pitch(k) ! angle of attack
+            alpha(i,j,k) = -atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) + u%PitchAndTwist(j,k) ! angle of attack
             call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
-            phi(i,j,k) = alpha(i,j,k) - u%pitch(k) ! inflow angle
+            phi(i,j,k) = alpha(i,j,k) - u%PitchAndTwist(j,k) ! inflow angle
             Cn(i,j,k) = -AFI_interp%Cd*sin(phi(i,j,k)) - AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
             CTbe(i,j,k) = Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k)) ! thrust coefficient from blade element theory

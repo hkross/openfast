@@ -271,7 +271,11 @@ CONTAINS
    
 
       m%AllOuts( RtSpeed ) = omega*RPS2RPM
-      m%AllOuts( RtArea  ) = pi * rmax**2
+      if ( p_AD%WakeMod == WakeMod_DMST ) then
+         m%AllOuts( RtArea ) = 2.0_ReKi*rmax*abs(u%BladeMotion(1)%Position(3,p%NumBlNds) - u%BladeMotion(1)%Position(3,1))
+      else
+         m%AllOuts( RtArea  ) = pi * rmax**2
+      end if
       
       tmp = matmul( u%HubMotion%Orientation(:,:,1), m%V_DiskAvg )
       m%AllOuts( RtVAvgxh ) = tmp(1)
@@ -354,7 +358,11 @@ CONTAINS
          denom = 0.5*p%AirDens*m%AllOuts( RtArea )*m%V_dot_x**2
          m%AllOuts( RtAeroCp ) = m%AllOuts( RtAeroPwr ) / (denom * m%V_dot_x)
          m%AllOuts( RtAeroCq ) = m%AllOuts( RtAeroMxh ) / (denom * rmax )
-         m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxh ) /  denom
+         if ( p_AD%WakeMod == WakeMod_DMST ) then
+            m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxg ) /  denom
+         else
+            m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxh ) /  denom
+         end if
       end if
       
 
@@ -486,7 +494,7 @@ CONTAINS
             m%AllOuts( BNAlpha(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_alpha(j)*R2D
             if ( p_AD%WakeMod == WakeMod_FVW ) then
                m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
-            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
+            else
                m%AllOuts( BNTheta(beta,k) ) = m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k)*R2D
             endif
             m%AllOuts( BNPhi(  beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_phi(j)*R2D
@@ -499,29 +507,35 @@ CONTAINS
             m%AllOuts( BNCx(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)
             m%AllOuts( BNCy(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cy(j)
 
+            cp=cos(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
+            sp=sin(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
+
             if ( p_AD%WakeMod == WakeMod_FVW ) then
                ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! cos(theta)
                st=sin(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! sin(theta)
-            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
-               ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k))     ! cos(theta)
-               st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k))     ! sin(theta)
+               m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*ct + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*st
+               m%AllOuts( BNCt(   beta,k) ) =-m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*st + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*ct
+            else
+               m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sp
+               m%AllOuts( BNCt(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*cp - m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
             endif
-            m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*ct + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*st
-            m%AllOuts( BNCt(   beta,k) ) =-m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*st + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*ct
 
-            cp=cos(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
-            sp=sin(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
             m%AllOuts( BNFl(   beta,k) ) =  m%X(j,k)*cp - m%Y(j,k)*sp
             m%AllOuts( BNFd(   beta,k) ) =  m%X(j,k)*sp + m%Y(j,k)*cp
             m%AllOuts( BNMm(   beta,k) ) =  m%M(j,k)
             m%AllOuts( BNFx(   beta,k) ) =  m%X(j,k)
             m%AllOuts( BNFy(   beta,k) ) = -m%Y(j,k)
-            m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)*ct - m%Y(j,k)*st
-            m%AllOuts( BNFt(   beta,k) ) = -m%X(j,k)*st - m%Y(j,k)*ct
+            if ( p_AD%WakeMod == WakeMod_FVW ) then
+               m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)*ct - m%Y(j,k)*st
+               m%AllOuts( BNFt(   beta,k) ) = -m%X(j,k)*st - m%Y(j,k)*ct
+            else
+               m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)
+               m%AllOuts( BNFt(   beta,k) ) =  m%Y(j,k)
+            endif
 
             if ( p_AD%WakeMod == WakeMod_FVW ) then
                m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
-            elseif ( p_AD%WakeMod == WakeMod_DMST ) then
+            else
                m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%rotors(iRot)%DMST%chord(j,k) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
             endif
          end do ! nodes

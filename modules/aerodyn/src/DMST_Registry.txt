@@ -55,8 +55,7 @@ typedef   ^                            ^                             ReKi       
 #
 typedef   ^                            InputType                     ReKi                     omega                           -          -          -          "Rotor angular velocity" rad/s
 typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}{:}  -          -          "Free-stream velocity" m/s
-typedef   ^                            ^                             ReKi                     pitch                           {:}        -          -          "Blade pitch angle" rad
-typedef   ^                            ^                             ReKi                     PitchAndTwist                   {:}{:}     -          -          "Local pitch + twist (aerodynamic + elastic) angle" rad
+typedef   ^                            ^                             ReKi                     PitchAndTwist                   {:}{:}     -          -          "Local pitch + twist angle" rad
 typedef   ^                            ^                             INTEGER                  blade_st                        {:}{:}     -          -          "Streamtube corresponding to each blade node" -
 typedef   ^                            ^                             ReKi                     UserProp                        {:}{:}     -          -          "Optional user property for interpolating airfoils (per element per blade)" -
 #
