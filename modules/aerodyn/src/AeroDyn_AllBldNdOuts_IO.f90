@@ -556,7 +556,7 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, Indx
             else
                DO IdxBlade=1,p%BldNd_BladesOut
                   DO IdxNode=1,p%NumBlNds                   
-                     y%WriteOutput( OutIdx )  =m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode)*R2D
+                     y%WriteOutput( OutIdx )  = m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode)*R2D
                      OutIdx = OutIdx + 1
                   END DO
                END DO
@@ -692,9 +692,9 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, Indx
             else
                DO IdxBlade=1,p%BldNd_BladesOut
                   DO IdxNode=1,p%NumBlNds                   
-                     ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! cos(theta)
-                     st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! sin(theta)
-                     y%WriteOutput( OutIdx )  = m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cx(IdxNode)*ct + m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cy(IdxNode)*st
+                     cp=cos(m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode))    ! cos(phi)
+                     sp=sin(m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode))    ! sin(phi)
+                     y%WriteOutput( OutIdx )  = m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cl(IdxNode)*cp + m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cd(IdxNode)*sp
                      OutIdx = OutIdx + 1
                   END DO
                END DO
@@ -723,9 +723,9 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, Indx
             else
                DO IdxBlade=1,p%BldNd_BladesOut
                   DO IdxNode=1,p%NumBlNds                   
-                     ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! cos(theta)
-                     st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! sin(theta)
-                     y%WriteOutput( OutIdx )  = -m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cx(IdxNode)*st + m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cy(IdxNode)*ct
+                     cp=cos(m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode))    ! cos(phi)
+                     sp=sin(m_AD%rotors(iRot)%blds(IdxBlade)%BN_phi(IdxNode))    ! sin(phi)
+                     y%WriteOutput( OutIdx )  = m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cd(IdxNode)*cp - m_AD%rotors(iRot)%blds(IdxBlade)%BN_Cl(IdxNode)*sp
                      OutIdx = OutIdx + 1
                   END DO
                END DO
@@ -824,9 +824,7 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, Indx
             else
                DO IdxBlade=1,p%BldNd_BladesOut
                   DO IdxNode=1,p%NumBlNds   
-                     ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! cos(theta)
-                     st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! sin(theta)
-                     y%WriteOutput( OutIdx )  = m%X(IdxNode,IdxBlade)*ct - m%Y(IdxNode,IdxBlade)*st
+                     y%WriteOutput( OutIdx )  = m%X(IdxNode,IdxBlade)
                      OutIdx = OutIdx + 1
                   END DO
                END DO
@@ -855,9 +853,7 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, Indx
             else
                DO IdxBlade=1,p%BldNd_BladesOut
                   DO IdxNode=1,p%NumBlNds   
-                     ct=cos(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! cos(theta)
-                     st=sin(m_AD%rotors(iRot)%DMST_u%PitchAndTwist(IdxNode,IdxBlade))    ! sin(theta)
-                     y%WriteOutput( OutIdx )  = -m%X(IdxNode,IdxBlade)*st - m%Y(IdxNode,IdxBlade)*ct
+                     y%WriteOutput( OutIdx )  = m%Y(IdxNode,IdxBlade)
                      OutIdx = OutIdx + 1
                   END DO
                END DO 
