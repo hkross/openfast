@@ -1674,7 +1674,7 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( DBEMTau1 ) = .true.
    end if
 
-   if (.not. p%Buoyancy) then  ! Invalid buoyant loads
+   if (.not. p%Buoyancy .or. p_AD%WakeMod == WakeMod_DMST) then  ! Invalid buoyant loads
       InvalidOutput( HbFbx ) = .true.
       InvalidOutput( HbFby ) = .true.
       InvalidOutput( HbFbz ) = .true.
@@ -1711,6 +1711,73 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       do i = 1,size(BNMbs,2)
          InvalidOutput( BNMbs(:,i) ) = .true.
       end do
+   end if
+
+   if (p_AD%WakeMod == WakeMod_DMST) then
+      do i = 1,size(BNCurve,2)
+         InvalidOutput( BNCurve(:,i) ) = .true.
+      end do
+      do i = 1,size(BNClrnc,2)
+         InvalidOutput( BNClrnc(:,i) ) = .true.
+      end do
+      do i = 1,size(BNCpmin,2)
+         InvalidOutput( BNCpmin(:,i) ) = .true.
+      end do
+      do i = 1,size(BNFx,2)
+         InvalidOutput( BNFx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNFy,2)
+         InvalidOutput( BNFy(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCx,2)
+         InvalidOutput( BNCx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCy,2)
+         InvalidOutput( BNCy(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNSigCr,2)
+         InvalidOutput( BNSigCr(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSgCav,2)
+         InvalidOutput( BNSgCav(:,i) ) = .true.
+      end do
+      do i = 1,size(TwNVUnd,1)
+         InvalidOutput( TwNVUnd(i,:) ) = .true.
+      end do
+      do i = 1,size(TwNSTV,1)
+         InvalidOutput( TwNSTV(i,:)  ) = .true.
+      end do
+      InvalidOutput( BAzimuth ) = .true.
+      InvalidOutput( BPitch   ) = .true.
+      InvalidOutput( TwNVrel  ) = .true.
+      InvalidOutput( TwNDynP  ) = .true.
+      InvalidOutput( TwNRe    ) = .true.
+      InvalidOutput( TwNM     ) = .true.
+      InvalidOutput( TwNFdx   ) = .true.
+      InvalidOutput( TwNFdy   ) = .true.
+      InvalidOutput( TFAlpha  ) = .true.
+      InvalidOutput( TFMach   ) = .true.
+      InvalidOutput( TFRe     ) = .true.
+      InvalidOutput( TFVrel   ) = .true.
+      InvalidOutput( TFVundxi ) = .true.
+      InvalidOutput( TFVundyi ) = .true.
+      InvalidOutput( TFVundzi ) = .true.
+      InvalidOutput( TFVindxi ) = .true.
+      InvalidOutput( TFVindyi ) = .true.
+      InvalidOutput( TFVindzi ) = .true.
+      InvalidOutput( TFVrelxi ) = .true.
+      InvalidOutput( TFVrelyi ) = .true.
+      InvalidOutput( TFVrelzi ) = .true.
+      InvalidOutput( TFSTVxi  ) = .true.
+      InvalidOutput( TFSTVyi  ) = .true.
+      InvalidOutput( TFSTVzi  ) = .true.
+      InvalidOutput( TFFxi    ) = .true.
+      InvalidOutput( TFFyi    ) = .true.
+      InvalidOutput( TFFzi    ) = .true.
+      InvalidOutput( TFMxi    ) = .true.
+      InvalidOutput( TFMyi    ) = .true.
+      InvalidOutput( TFMzi    ) = .true.
+      InvalidOutput( RtSkew   ) = .true.
    end if
    
    DO i = p%NTwOuts+1,9  ! Invalid tower nodes

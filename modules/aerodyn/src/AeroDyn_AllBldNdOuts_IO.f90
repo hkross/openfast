@@ -1480,7 +1480,7 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
 
 !   ..... Developer must add checking for invalid inputs here: .....
 
-   if (.not. p%Buoyancy) then
+   if (.not. p%Buoyancy .or. p_AD%WakeMod == WakeMod_DMST) then
       InvalidOutput( BldNd_Fbn ) = .true.
       InvalidOutput( BldNd_Fbt ) = .true.
       InvalidOutput( BldNd_Fbs ) = .true.
@@ -1510,6 +1510,28 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( BldNd_UA_x5 ) = .true.
    end if
 
+   if (p_AD%WakeMod == WakeMod_DMST) then
+      InvalidOutput( BldNd_Curve     ) = .true.
+      InvalidOutput( BldNd_SigCr     ) = .true.
+      InvalidOutput( BldNd_SgCav     ) = .true.
+      InvalidOutput( BldNd_Fx        ) = .true.
+      InvalidOutput( BldNd_Fy        ) = .true.
+      InvalidOutput( BldNd_Cx        ) = .true.
+      InvalidOutput( BldNd_Cy        ) = .true.
+      InvalidOutput( BldNd_Clrnc     ) = .true.
+      InvalidOutput( BldNd_Cpmin     ) = .true.
+      InvalidOutput( BldNd_GeomPhi   ) = .true.
+      InvalidOutput( BldNd_Chi       ) = .true.
+      InvalidOutput( BldNd_UA_Flag   ) = .true.
+      InvalidOutput( BldNd_UA_x1     ) = .true.
+      InvalidOutput( BldNd_UA_x2     ) = .true.
+      InvalidOutput( BldNd_UA_x3     ) = .true.
+      InvalidOutput( BldNd_UA_x4     ) = .true.
+      InvalidOutput( BldNd_UA_x5     ) = .true.
+      InvalidOutput( BldNd_Cl_Static ) = .false.
+      InvalidOutput( BldNd_Cd_Static ) = .false.
+      InvalidOutput( BldNd_Cm_Static ) = .false.
+   end if
    
 !   ................. End of validity checking .................
 
