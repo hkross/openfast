@@ -587,7 +587,7 @@ subroutine AD_ReInit(p, x, xd, z, OtherState, m, Interval, ErrStat, ErrMsg )
       enddo
    else
       ErrStat = ErrID_Fatal
-      ErrMsg = 'AD_ReInit: Cannot reinitialize AeroDyn with OLAF'
+      ErrMsg = 'AD_ReInit: Cannot reinitialize AeroDyn with OLAF or DMST'
    end if
 
       
@@ -1953,7 +1953,7 @@ subroutine AD_CavtCrit(u, p, m, errStat, errMsg)
 
    ! Local variables
    integer                                       :: i, j
-   integer(intKi)                                :: iR, iW
+   integer(intKi)                                :: iR
    real(ReKi)                                    :: SigmaCavitCrit, SigmaCavit
    real(ReKi)                                    :: Vreltemp
    real(ReKi)                                    :: Cpmintemp
@@ -1969,10 +1969,9 @@ subroutine AD_CavtCrit(u, p, m, errStat, errMsg)
                if ( p%WakeMod == WakeMod_BEMT .or. p%WakeMod == WakeMod_DBEMT ) then
                   Vreltemp = m%rotors(iR)%BEMT_y%Vrel(i,j)
                   Cpmintemp = m%rotors(iR)%BEMT_y%Cpmin(i,j)
-               else if ( p%WakeMod == WakeMod_FVW ) then
-                  iW = p%FVW%Bld2Wings(iR,j)
-                  Vreltemp = m%FVW%W(iW)%BN_Vrel(i)
-                  Cpmintemp = m%FVW%W(iW)%BN_Cpmin(i)
+               else
+                  Vreltemp = m%rotors(iR)%blds(j)%BN_Vrel(i)
+                  Cpmintemp = m%rotors(iR)%blds(j)%BN_Cpmin(i)
                end if
 
                if ( EqualRealNos( Vreltemp, 0.0_ReKi ) ) call SetErrStat( ErrID_Fatal, 'Vrel cannot be zero to do a cavitation check', ErrStat, ErrMsg, 'AD_CavtCrit' ) 
