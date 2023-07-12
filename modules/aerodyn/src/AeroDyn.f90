@@ -3822,6 +3822,7 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, ErrStat, ErrMsg )
 
       if ( InputFileData%NTwOuts > 0 ) call SetErrStat( ErrID_Fatal, 'NTwOuts cannot be greater than zero with DMST model.', ErrStat, ErrMsg, RoutineName )
 
+      if ( InitInp%MHK /= MHK_None ) call SetErrStat( ErrID_Fatal, 'MHK turbines cannot be modeled with DMST.', ErrStat, ErrMsg, RoutineName )
    end if
 
    if ( InputFileData%CavitCheck .and. InputFileData%AFAeroMod == AFAeroMod_BL_unsteady) then
