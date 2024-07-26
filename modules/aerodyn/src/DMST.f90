@@ -498,7 +498,7 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
             phi(i,j,k) = alpha(i,j,k) - u%PitchAndTwist(k,1) ! inflow angle
             Cn(i,j,k) = AFI_interp%Cd*sin(phi(i,j,k)) + AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
             Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
-            CTbe(i,j,k) = abs(Ct(i,j,k)*cos(p%theta_st(n,k)) + Cn(i,j,k)*sin(p%theta_st(n,k))) ! thrust coefficient from blade element theory
+            CTbe(i,j,k) = Ct(i,j,k)*cos(p%theta_st(n,k)) - Cn(i,j,k)*sin(p%theta_st(n,k)) ! thrust coefficient from blade element theory
          end do
       end do
    end do
