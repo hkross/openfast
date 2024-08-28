@@ -3613,7 +3613,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    real(ReKi)                               :: AxInd, TanInd, Vrel, phi, alpha, Re
    type(AFI_OutputType)                     :: AFI_interp     ! Resulting values from lookup table
    real(ReKi)                               :: UrelWind_s(3)
-   real(ReKi)                               :: Cn, Ct
+   real(ReKi)                               :: Cx, Cy
    real(ReKi)                               :: Cl_static, Cd_static, Cm_static
    real(ReKi)                               :: Cl_dyn, Cd_dyn, Cm_dyn
    integer(intKi)                           :: ErrStat2
@@ -3649,20 +3649,23 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          Cd_dyn    = AFI_interp%Cd
          Cm_dyn    = AFI_interp%Cm
             
-         phi = alpha - m%DMST_u%PitchAndTwist(j,k)
 
          cp = cos(phi)
          sp = sin(phi)
-         Cn = Cl_dyn*cp + Cd_dyn*sp ! n going outwards radially
-         Ct = Cd_dyn*cp - Cl_dyn*sp ! t going towards the TE
+         Cx = Cd_dyn*sp + Cl_dyn*cp ! x pos going inwards radially
+         Cy = Cd_dyn*cp - Cl_dyn*sp ! y pos going towards the TE
 
          q = 0.5 * p%airDens * Vrel**2
-         force(1)  = Cn * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to chord) of the jth node on the kth blade
-         force(2)  = Ct * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to chord) of the jth node on the kth blade
+         force(1)  = Cx * q * p%DMST%chord(j,k)        ! normal force per unit length (normal to chord) of the jth node on the kth blade
+         force(2)  = Cy * q * p%DMST%chord(j,k)        ! tangential force per unit length (tangential to chord) of the jth node on the kth blade
          moment(3) = Cm_dyn * q * p%DMST%chord(j,k)**2 ! pitching moment per unit length of the jth node on the kth blade
 
          m%X(j,k) = force(1)
          m%Y(j,k) = force(2)
+         m%Z(j,k) = 0.0_ReKi
+         m%Mx(j,k) = 0.0_ReKi
+         m%My(j,k) = 0.0_ReKi
+         m%Mz(j,k) = moment(3)
          m%M(j,k) = moment(3)
 
          y%BladeLoad(k)%force(:,j)  = matmul( transpose(m%orientationAnnulus(:,:,j,k)), force )  ! force per unit length of the jth node on the kth blade
