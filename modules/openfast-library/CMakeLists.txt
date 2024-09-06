@@ -43,22 +43,24 @@ add_library(openfast_prelib STATIC
 target_link_libraries(openfast_prelib 
   nwtclibs
   versioninfolib
-  aerodyn14lib
+  aerodisklib
   aerodynlib
+  extloadslib
   beamdynlib
   elastodynlib
   extptfm_mckflib
   feamlib
-  foamtypeslib
+  extinflowtypeslib
   hydrodynlib
   icedynlib
   icefloelib
   ifwlib
-  maplib
+  mappplib
   moordynlib
   orcaflexlib
   sctypeslib
   seastlib
+  sedlib
   servodynlib
   subdynlib
 )
@@ -68,8 +70,10 @@ add_library(openfast_postlib STATIC
   src/FAST_Mods.f90
   src/FAST_Subs.f90
   src/FAST_Solver.f90
+  src/FAST_SS_Subs.f90
+  src/FAST_SS_Solver.f90
 )
-target_link_libraries(openfast_postlib openfast_prelib foamfastlib scfastlib)
+target_link_libraries(openfast_postlib openfast_prelib extinflowlib scfastlib)
 target_include_directories(openfast_postlib PUBLIC 
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/src>  
 )

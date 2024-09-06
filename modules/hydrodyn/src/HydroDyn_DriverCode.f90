@@ -81,7 +81,7 @@ PROGRAM HydroDynDriver
    real(DbKi)                                         :: TiLstPrn             ! The simulation time of the last print
    integer                                            :: n_SttsTime           ! Number of time steps between screen status messages (-)
 
-   
+   integer                                            :: i                    ! Loop counter   
    
    logical                                            :: SeaState_Initialized, HydroDyn_Initialized
    ! For testing
@@ -184,7 +184,6 @@ PROGRAM HydroDynDriver
       ErrStat = ErrID_Fatal
       call HD_DvrEnd()
    end if
-
   
       ! Set HD Init Inputs based on SeaStates Init Outputs
    call SetHD_InitInputs()
@@ -207,10 +206,10 @@ PROGRAM HydroDynDriver
 
    
    ! Destroy InitInput and InitOutput data (and nullify pointers to SeaState data)
-   CALL SeaSt_DestroyInitInput(  InitInData_SeaSt,  ErrStat, ErrMsg, DEALLOCATEpointers=.false. );      CALL CheckError()
-   CALL SeaSt_DestroyInitOutput( InitOutData_SeaSt, ErrStat, ErrMsg, DEALLOCATEpointers=.false. );      CALL CheckError()
-   CALL HydroDyn_DestroyInitInput(  InitInData_HD,  ErrStat, ErrMsg, DEALLOCATEpointers=.false. );      CALL CheckError()
-   CALL HydroDyn_DestroyInitOutput( InitOutData_HD, ErrStat, ErrMsg, DEALLOCATEpointers=.false. );      CALL CheckError()
+   CALL SeaSt_DestroyInitInput(  InitInData_SeaSt,  ErrStat, ErrMsg );      CALL CheckError()
+   CALL SeaSt_DestroyInitOutput( InitOutData_SeaSt, ErrStat, ErrMsg );      CALL CheckError()
+   CALL HydroDyn_DestroyInitInput(  InitInData_HD,  ErrStat, ErrMsg );      CALL CheckError()
+   CALL HydroDyn_DestroyInitOutput( InitOutData_HD, ErrStat, ErrMsg );      CALL CheckError()
    
    
    ! Create Mesh mappings
@@ -231,10 +230,31 @@ PROGRAM HydroDynDriver
          CALL CheckError()
       end if
    END IF
-   
-   
-   ! Set any steady-state inputs, once before the time-stepping loop (these don't change, so we don't need to update them in the time-marching simulation)
-   CALL SetHDInputs_Constant(u(1), mappingData, drvrData, ErrStat, ErrMsg);       CALL CheckError()
+
+   ! Set initial inputs at t = 0
+   IF (( drvrData%PRPInputsMod /= 2 ) .AND. ( drvrData%PRPInputsMod >= 0 )) THEN
+      ! Set any steady-state inputs, once before the time-stepping loop (these don't change, so we don't need to update them in the time-marching simulation)
+      CALL SetHDInputs_Constant(u(1), mappingData, drvrData, ErrStat, ErrMsg);       CALL CheckError()
+   ELSE
+      CALL SetHDInputs(0.0_R8Ki, n, u(1), mappingData, drvrData, ErrStat, ErrMsg);   CALL CheckError()
+   END IF
+
+   ! Set the initial low-pass-filtered displacements of potential-flow bodies if ExctnDisp = 2
+   IF ( p%PotMod == 1_IntKi ) THEN
+      IF ( p%WAMIT(1)%ExctnDisp == 2_IntKi ) THEN
+         IF (p%NBodyMod .EQ. 1_IntKi) THEN ! One instance of WAMIT with NBody
+            DO i = 1,p%NBody
+               xd%WAMIT(1)%BdyPosFilt(1,i,:) = u(1)%WAMITMesh%TranslationDisp(1,i)
+               xd%WAMIT(1)%BdyPosFilt(2,i,:) = u(1)%WAMITMesh%TranslationDisp(2,i)
+            END DO
+         ELSE IF (p%NBodyMod > 1_IntKi) THEN ! NBody instances of WAMIT with one body each
+            DO i = 1,p%NBody
+               xd%WAMIT(i)%BdyPosFilt(1,1,:) = u(1)%WAMITMesh%TranslationDisp(1,i)
+               xd%WAMIT(i)%BdyPosFilt(2,1,:) = u(1)%WAMITMesh%TranslationDisp(2,i)
+            END DO
+         END IF
+      END IF
+   END IF
 
    !...............................................................................................................................
    ! --- Linearization
@@ -243,10 +263,10 @@ PROGRAM HydroDynDriver
       ! --- Creating useful EDRPtMesh
 
       call Eye(dcm, ErrStat, ErrMsg );            CALL CheckError()
-      call CreatePointMesh(mappingData%EDRPt_Loads,     (/0.0_ReKi, 0.0_ReKi, drvrData%PtfmRefzt/), dcm, HasMotion=.false., HasLoads=.true.,  ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
-      call CreatePointMesh(mappingData%EDRPt_Motion,    (/0.0_ReKi, 0.0_ReKi, drvrData%PtfmRefzt/), dcm, HasMotion=.true.,  HasLoads=.false., ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
-      call CreatePointMesh(mappingData%ZZZPtMeshMotion, (/0.0_ReKi, 0.0_ReKi, 0.0_ReKi          /), dcm, HasMotion=.true.,  HasLoads=.false., ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
-      call CreatePointMesh(mappingData%ZZZPtMeshLoads , (/0.0_ReKi, 0.0_ReKi, 0.0_ReKi          /), dcm, HasMotion=.false., HasLoads=.true.,  ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
+      call CreateInputPointMesh(mappingData%EDRPt_Loads,     (/0.0_ReKi, 0.0_ReKi, drvrData%PtfmRefzt/), dcm, HasMotion=.false., HasLoads=.true.,  ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
+      call CreateInputPointMesh(mappingData%EDRPt_Motion,    (/0.0_ReKi, 0.0_ReKi, drvrData%PtfmRefzt/), dcm, HasMotion=.true.,  HasLoads=.false., ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
+      call CreateInputPointMesh(mappingData%ZZZPtMeshMotion, (/0.0_ReKi, 0.0_ReKi, 0.0_ReKi          /), dcm, HasMotion=.true.,  HasLoads=.false., ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
+      call CreateInputPointMesh(mappingData%ZZZPtMeshLoads , (/0.0_ReKi, 0.0_ReKi, 0.0_ReKi          /), dcm, HasMotion=.false., HasLoads=.true.,  ErrStat=ErrStat, ErrMsg=ErrMsg );            CALL CheckError()
 
       CALL MeshMapCreate( u(1)%PRPMesh,             mappingData%EDRPt_Motion,   mappingData%HD_Ref_2_ED_Ref,       ErrStat, ErrMsg );    CALL CheckError()
       CALL MeshMapCreate( mappingData%EDRPt_Motion, u(1)%PRPMesh,               mappingData%ED_Ref_2_HD_Ref,       ErrStat, ErrMsg );    CALL CheckError()
@@ -271,10 +291,11 @@ PROGRAM HydroDynDriver
       Time = (n-1) * drvrData%TimeInterval
       InputTime(1) = Time
 
+      IF (( drvrData%PRPInputsMod == 2 ) .OR. ( drvrData%PRPInputsMod < 0 )) THEN
          ! Modify u (likely from the outputs of another module or a set of test conditions) here:
-      call SetHDInputs(Time, n, u(1), mappingData, drvrData, ErrStat, ErrMsg);  CALL CheckError()
-      ! SeaState has no inputs, so no need to set them.
-      
+         call SetHDInputs(Time, n, u(1), mappingData, drvrData, ErrStat, ErrMsg);  CALL CheckError()
+         ! SeaState has no inputs, so no need to set them.
+      END IF
      
       if (n==1 .and. drvrData%Linearize) then
          ! we set u(1)%PRPMesh motions, so we should assume that EDRP changed similarly: 
@@ -323,52 +344,9 @@ subroutine SetHD_InitInputs()
    InitInData_HD%Linearize    = drvrData%Linearize
    
    ! Data from InitOutData_SeaSt:
-   InitInData_HD%WtrDens      = InitOutData_SeaSt%WtrDens
-   InitInData_HD%WtrDpth      = InitOutData_SeaSt%WtrDpth
-   InitInData_HD%MSL2SWL      = InitOutData_SeaSt%MSL2SWL
-   InitInData_HD%NStepWave    = InitOutData_SeaSt%NStepWave
-   InitInData_HD%NStepWave2   = InitOutData_SeaSt%NStepWave2
-   InitInData_HD%RhoXg        = InitOutData_SeaSt%RhoXg
-   InitInData_HD%WaveMod      = InitOutData_SeaSt%WaveMod
-   InitInData_HD%WaveStMod    = InitOutData_SeaSt%WaveStMod
-   InitInData_HD%WaveDirMod   = InitOutData_SeaSt%WaveDirMod
-   InitInData_HD%WvLowCOff    = InitOutData_SeaSt%WvLowCOff 
-   InitInData_HD%WvHiCOff     = InitOutData_SeaSt%WvHiCOff  
-   InitInData_HD%WvLowCOffD   = InitOutData_SeaSt%WvLowCOffD
-   InitInData_HD%WvHiCOffD    = InitOutData_SeaSt%WvHiCOffD 
-   InitInData_HD%WvLowCOffS   = InitOutData_SeaSt%WvLowCOffS
-   InitInData_HD%WvHiCOffS    = InitOutData_SeaSt%WvHiCOffS
-   
    InitInData_HD%InvalidWithSSExctn     =  InitOutData_SeaSt%InvalidWithSSExctn
-   
-   InitInData_HD%WaveDirMin     =  InitOutData_SeaSt%WaveDirMin  
-   InitInData_HD%WaveDirMax     =  InitOutData_SeaSt%WaveDirMax  
-   InitInData_HD%WaveDir        =  InitOutData_SeaSt%WaveDir     
-   InitInData_HD%WaveMultiDir   =  InitOutData_SeaSt%WaveMultiDir
-   InitInData_HD%WaveDOmega     =  InitOutData_SeaSt%WaveDOmega  
-   InitInData_HD%MCFD           =  InitOutData_SeaSt%MCFD
-   !InitInData_HD%WaveElev0      => InitOutData_SeaSt%WaveElev0 
-   CALL MOVE_ALLOC(  InitOutData_SeaSt%WaveElev0, InitInData_HD%WaveElev0 )  
-   InitInData_HD%WaveTime       => InitOutData_SeaSt%WaveTime  
-   InitInData_HD%WaveDynP       => InitOutData_SeaSt%WaveDynP  
-   InitInData_HD%WaveAcc        => InitOutData_SeaSt%WaveAcc   
-   InitInData_HD%WaveVel        => InitOutData_SeaSt%WaveVel   
-   
-   InitInData_HD%PWaveDynP0     => InitOutData_SeaSt%PWaveDynP0  
-   InitInData_HD%PWaveAcc0      => InitOutData_SeaSt%PWaveAcc0   
-   InitInData_HD%PWaveVel0      => InitOutData_SeaSt%PWaveVel0   
-   
-   InitInData_HD%WaveAccMCF     => InitOutData_SeaSt%WaveAccMCF
-   InitInData_HD%PWaveAccMCF0   => InitOutData_SeaSt%PWaveAccMCF0
-   
-   InitInData_HD%WaveElevC0     => InitOutData_SeaSt%WaveElevC0
-   CALL MOVE_ALLOC( InitOutData_SeaSt%WaveElevC, InitInData_HD%WaveElevC )
-   InitInData_HD%WaveDirArr     => InitOutData_SeaSt%WaveDirArr
-   InitInData_HD%WaveElev1      => InitOutData_SeaSt%WaveElev1
-   InitInData_HD%WaveElev2      => InitOutData_SeaSt%WaveElev2
-   
-   call SeaSt_Interp_CopyParam(InitOutData_SeaSt%SeaSt_Interp_p, InitInData_HD%SeaSt_Interp_p, MESH_NEWCOPY, ErrStat, ErrMsg ); CALL CheckError()
 
+   InitInData_HD%WaveField => InitOutData_SeaSt%WaveField
 
 end subroutine SetHD_InitInputs
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -409,13 +387,13 @@ subroutine HD_DvrEnd()
       end if
          
          ! Destroy Initialization data
-      CALL SeaSt_DestroyInitOutput( InitOutData_SeaSt, ErrStat2, ErrMsg2, DEALLOCATEpointers=.false. )
+      CALL SeaSt_DestroyInitOutput( InitOutData_SeaSt, ErrStat2, ErrMsg2 )
          call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      CALL SeaSt_DestroyInitInput( InitInData_SeaSt, ErrStat2, ErrMsg2, DEALLOCATEpointers=.false. )
+      CALL SeaSt_DestroyInitInput( InitInData_SeaSt, ErrStat2, ErrMsg2 )
          call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      CALL HydroDyn_DestroyInitInput(  InitInData_HD,  ErrStat2, ErrMsg2, DEALLOCATEpointers=.false. )
+      CALL HydroDyn_DestroyInitInput(  InitInData_HD,  ErrStat2, ErrMsg2 )
          call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      CALL HydroDyn_DestroyInitOutput( InitOutData_HD, ErrStat2, ErrMsg2, DEALLOCATEpointers=.false. )
+      CALL HydroDyn_DestroyInitOutput( InitOutData_HD, ErrStat2, ErrMsg2 )
          call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
 
             ! Destroy copies of HD data

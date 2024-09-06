@@ -18,7 +18,7 @@
 # -- OpenFAST Testing
 # -----------------------------------------------------------
 
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenFAST_RegressionTest Fortran)
 
 include(CTest)
@@ -73,6 +73,12 @@ set(CTEST_MOORDYN_EXECUTABLE "${CMAKE_BINARY_DIR}/modules/moordyn/moordyn_driver
 
 # Set the SeaState executable configuration option and default
 set(CTEST_SEASTATE_EXECUTABLE "${CMAKE_BINARY_DIR}/modules/seastate/seastate_driver" CACHE FILEPATH "Specify the SeaState driver executable to use in testing.")
+
+# Set the AeroDisk executable configuration option and default
+set(CTEST_AERODISK_EXECUTABLE "${CMAKE_BINARY_DIR}/modules/aerodisk/aerodisk_driver" CACHE FILEPATH "Specify the AeroDisk driver executable to use in testing.")
+
+# Set the SED executable configuration option and default
+set(CTEST_SED_EXECUTABLE "${CMAKE_BINARY_DIR}/modules/simple-elastodyn/sed_driver" CACHE FILEPATH "Specify the SED driver executable to use in testing.")
 
 
 # Set the testing tolerance
@@ -161,6 +167,11 @@ add_custom_command(
   DEPENDS DISCON
   COMMAND "${CMAKE_COMMAND}" -E copy "${src}/DISCON/build/DISCON.dll" "${ff_dest}/DISCON_WT3.dll"
 )
+add_custom_command(
+  OUTPUT "${ff_dest}/DISCON_WT4.dll"
+  DEPENDS DISCON
+  COMMAND "${CMAKE_COMMAND}" -E copy "${src}/DISCON/build/DISCON.dll" "${ff_dest}/DISCON_WT4.dll"
+)
 
 add_custom_target(
   regression_test_controllers
@@ -174,6 +185,7 @@ add_custom_target(
     "${ff_dest}/DISCON_WT1.dll"
     "${ff_dest}/DISCON_WT2.dll"
     "${ff_dest}/DISCON_WT3.dll"
+    "${ff_dest}/DISCON_WT4.dll"
 )
 
 add_custom_target(

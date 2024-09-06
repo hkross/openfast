@@ -112,6 +112,12 @@ MODULE NWTC_Num
       MODULE PROCEDURE EulerExtractR8
    END INTERFACE
 
+      !> \copydoc nwtc_num::fzero_r4()
+   INTERFACE fZeros
+      MODULE PROCEDURE fzero_r4
+      MODULE PROCEDURE fzero_r8
+   END INTERFACE
+
       !> \copydoc nwtc_num::taitbryanyxzextractr4()
       !! See nwtc_num::taitbryanyxzextractr4() for details on the algorithm
    INTERFACE TaitBryanYXZExtract
@@ -1687,8 +1693,8 @@ CONTAINS
 
    END FUNCTION EqualRealNos8
 !=======================================================================
-!> This function creates a rotation matrix, M, from a 1-2-3 rotation
-!! sequence of the 3 Euler angles, \f$\theta_x\f$, \f$\theta_y\f$, and \f$\theta_z\f$, in radians.
+!> This function creates a rotation matrix, M, from a 3-2-1 intrinsic rotation
+!! sequence of the 3 Tait-Bryan angles (1-2-3 extrinsic rotation), \f$\theta_x\f$, \f$\theta_y\f$, and \f$\theta_z\f$, in radians.
 !! M represents a change of basis (from global to local coordinates; 
 !! not a physical rotation of the body). It is the inverse of EulerExtract (nwtc_num::eulerextract).
 !!
@@ -1752,8 +1758,8 @@ CONTAINS
 !> \copydoc nwtc_num::eulerconstructr4
    FUNCTION EulerConstructR8(theta) result(M)
    
-      ! this function creates a rotation matrix, M, from a 1-2-3 rotation
-      ! sequence of the 3 Euler angles, theta_x, theta_y, and theta_z, in radians.
+      ! this function creates a rotation matrix, M, from a 3-2-1 intrinsic rotation
+!! sequence of the 3 Tait-Bryan angles (1-2-3 extrinsic rotation), theta_x, theta_y, and theta_z, in radians.
       ! M represents a change of basis (from global to local coordinates; 
       ! not a physical rotation of the body). it is the inverse of EulerExtract (nwtc_num::eulerextract).
       !
@@ -3006,7 +3012,75 @@ END FUNCTION FindValidChannelIndx
 
    RETURN
    END FUNCTION InterpStpComp8
+!=======================================================================
+!> Routine to interpolate and/or extrapolate
+   FUNCTION InterpExtrapStp( XVal, XAry, YAry, Ind, AryLen ) RESULT(InterpExtrap)
 
+      ! Function declaration.
+
+   REAL(ReKi)                   :: InterpExtrap                                     !< The interpolated or extrapolated value of Y at XVal
+
+
+      ! Argument declarations.
+
+   INTEGER, INTENT(IN)          :: AryLen                                          ! Length of the arrays.
+   INTEGER, INTENT(INOUT)       :: Ind                                             ! Initial and final index into the arrays.
+
+   REAL(ReKi), INTENT(IN)       :: XAry    (AryLen)                                ! Array of X values to be interpolated.
+   REAL(ReKi), INTENT(IN)       :: XVal                                            ! X value to be interpolated.
+   REAL(ReKi), INTENT(IN)       :: YAry    (AryLen)                                ! Array of Y values to be interpolated.
+
+
+
+      ! Let's check the limits first.
+   IF (AryLen < 2) THEN
+      Ind = 1
+      InterpExtrap = YAry(1)
+      RETURN
+   END IF
+   
+   IF ( XVal <= XAry(1) )  THEN
+      Ind            = 1
+      InterpExtrap = GetLinearVal()  ! extrapolate (using slope of x(1) and x(2))
+      RETURN
+   ELSE IF ( XVal >= XAry(AryLen) )  THEN
+      Ind            = MAX(AryLen - 1, 1)
+      InterpExtrap = GetLinearVal()  ! extrapolate (using slope of x(AryLen-1) and x(AryLen))
+      RETURN
+   END IF
+
+
+     ! Let's interpolate!
+
+   Ind = MAX( MIN( Ind, AryLen-1 ), 1 )
+
+   DO
+
+      IF ( XVal < XAry(Ind) )  THEN
+
+         Ind = Ind - 1
+
+      ELSE IF ( XVal >= XAry(Ind+1) )  THEN
+
+         Ind = Ind + 1
+
+      ELSE
+
+         InterpExtrap = GetLinearVal()
+         RETURN
+
+      END IF
+
+   END DO
+
+
+   RETURN
+   
+   contains
+      real(ReKi) function GetLinearVal()
+         GetLinearVal = ( YAry(Ind+1) - YAry(Ind) )*( XVal - XAry(Ind) )/( XAry(Ind+1) - XAry(Ind) ) + YAry(Ind)
+      end function GetLinearVal
+   END FUNCTION InterpExtrapStp
 !=======================================================================
 !> \copydoc nwtc_num::interpstpcomp4
    FUNCTION InterpStpReal4( XVal, XAry, YAry, Ind, AryLen )
@@ -3311,6 +3385,44 @@ END FUNCTION FindValidChannelIndx
 
    RETURN
    END SUBROUTINE InterpStpMat8
+!=======================================================================
+!----------------------------------------------------------------------------------------------------------------------------------
+!> Perform linear interpolation of an array, where first column is assumed to be ascending time values
+!! Similar to InterpStpMat, I think (to check), interpTimeValues=InterpStpMat( array(:,1), time, array(:,1:), iLast, AryLen, values )
+!! First value is used for times before, and last value is used for time beyond
+   subroutine interpTimeValue(array, time, iLast, values)
+      real(ReKi), dimension(:,:), intent(in)    :: array  !< Values, shape nt x nc, where array(:,1) is the time vector
+      real(DbKi),                 intent(in)    :: time   !< Time where values are to be interpolated
+      integer(IntKi),             intent(inout) :: iLast  !< previous index used (to speed up interpolation) 
+      real(ReKi), dimension(:),   intent(out)   :: values !< vector of values, shape nc, at given `time`
+      integer :: i, nMax
+      real(ReKi) :: alpha
+      nMax = size(array, 1)
+      iLast = max( min(iLast, nMax), 1) ! Clip iLast between 1 and nMax
+      !call InterpStpMat( array(:,1), time, array(:,1:), iLast, AryLen, values )
+      if (array(iLast,1) > time) then 
+         values = array(iLast,2:)
+      elseif (iLast == nMax) then 
+         values = array(iLast,2:)
+      else
+         ! Look for index
+         do i = iLast, nMax
+            if (array(i,1)<=time) then
+               iLast=i
+            else
+               exit
+            endif
+         enddo
+         if (iLast==nMax) then
+            values = array(iLast,2:)
+         else
+            ! Linear interpolation
+            alpha = (array(iLast+1,1)-time)/(array(iLast+1,1)-array(iLast,1))
+            values = array(iLast,2:)*alpha + array(iLast+1,2:)*(1-alpha)
+         endif
+      endif
+   end subroutine interpTimeValue
+
 !=======================================================================   
 !< This routine linearly interpolates Dataset. It is
 !! set for a 2-d interpolation on x and y of the input point.
@@ -4946,7 +5058,7 @@ end function Rad2M180to180Deg
    RETURN
    END FUNCTION RegCubicSplineInterpM ! ( X, XAry, YAry, DelX, Coef, ErrStat, ErrMsg )
 !=======================================================================
-!> This routine is used to integrate funciton f over the interval [a, b]. This routine
+!> This routine is used to integrate function f over the interval [a, b]. This routine
 !! is useful for sufficiently smooth (e.g., analytic) integrands, integrated over
 !! intervals which contain no singularities, and where the endpoints are also nonsingular.
 !!
@@ -6383,7 +6495,13 @@ end function Rad2M180to180Deg
        REAL(R8Ki)                          :: t_out                     ! Time to which to be extrap/interpd
                                                                      
        REAL(SiKi)                          :: Angle2_mod
-    
+
+         ! If both inputs are the same, then the output must equal the input
+      if (Angle1 == Angle2) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6427,7 +6545,13 @@ end function Rad2M180to180Deg
        REAL(R8Ki)                          :: t_out                     ! Time to which to be extrap/interpd
                                                                      
        REAL(R8Ki)                          :: Angle2_mod
-    
+
+         ! If both inputs are the same, then the output must equal the input
+      if (Angle1 == Angle2) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6470,7 +6594,13 @@ end function Rad2M180to180Deg
        REAL(SiKi)                          :: t_out                     ! Time to which to be extrap/interpd
                                                                      
        REAL(SiKi)                          :: Angle2_mod
-    
+
+         ! If both inputs are the same, then the output must equal the input
+      if (Angle1 == Angle2) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6514,7 +6644,13 @@ end function Rad2M180to180Deg
        REAL(SiKi)                          :: t_out                     ! Time to which to be extrap/interpd
                                                                      
        REAL(R8Ki)                          :: Angle2_mod
-    
+
+         ! If both inputs are the same, then the output must equal the input
+      if (Angle1 == Angle2) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6560,7 +6696,13 @@ end function Rad2M180to180Deg
        REAL(DbKi)                          :: scaleFactor               ! temporary for extrapolation/interpolation
        REAL(SiKi)                          :: Angle2_mod
        REAL(SiKi)                          :: Angle3_mod
-    
+
+         ! If all inputs are the same, then the output must equal the input
+      if ((Angle1 == Angle2) .and. (Angle2 == Angle3)) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6623,7 +6765,13 @@ end function Rad2M180to180Deg
        REAL(DbKi)                          :: scaleFactor               ! temporary for extrapolation/interpolation
        REAL(R8Ki)                          :: Angle2_mod
        REAL(R8Ki)                          :: Angle3_mod
-    
+
+         ! If all inputs are the same, then the output must equal the input
+      if ((Angle1 == Angle2) .and. (Angle2 == Angle3)) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6686,7 +6834,13 @@ end function Rad2M180to180Deg
        REAL(R8Ki)                          :: scaleFactor               ! temporary for extrapolation/interpolation
        REAL(SiKi)                          :: Angle2_mod
        REAL(SiKi)                          :: Angle3_mod
-    
+
+         ! If all inputs are the same, then the output must equal the input
+      if ((Angle1 == Angle2) .and. (Angle2 == Angle3)) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6749,7 +6903,13 @@ end function Rad2M180to180Deg
        REAL(R8Ki)                          :: scaleFactor               ! temporary for extrapolation/interpolation
        REAL(R8Ki)                          :: Angle2_mod
        REAL(R8Ki)                          :: Angle3_mod
-    
+
+         ! If all inputs are the same, then the output must equal the input
+      if ((Angle1 == Angle2) .and. (Angle2 == Angle3)) then
+         Angle_out = Angle1
+         return
+      end if
+
           ! we'll subtract a constant from the times to resolve some
           ! numerical issues when t gets large (and to simplify the equations)
        t = tin - tin(1)
@@ -6794,4 +6954,78 @@ end function Rad2M180to180Deg
       
    END SUBROUTINE Angles_ExtrapInterp2_R8R
 !=======================================================================  
+   SUBROUTINE fZero_R4(x, f, roots, nZeros, Period)
+      REAL(R4Ki),           intent(in)    :: x(:) ! assumed to be monotonic increasing: x(1) < x(2) < ... < x(n)
+      REAL(R4Ki),           intent(in)    :: f(:) ! f(x)
+      REAL(R4Ki),           intent(inout) :: roots(:)
+      INTEGER(IntKi),       intent(  out) :: nZeros
+      REAL(R4Ki), OPTIONAL, intent(in)    :: Period   ! if this is provided, the function f is assumed to be periodic with f(x(j)) = f(x(j)+Period)
+      
+      integer(IntKi)                :: n, j
+      real(R4Ki)                    :: dx, df, m ! help to find zero crossing
+      
+      n = size(f)
+      
+      nZeros = 0
+      do j=2,n
+         if ((f(j-1) < 0 .and. f(j) >= 0) .or. (f(j-1) >= 0 .and. f(j) < 0)) then !this is a zero-crossing, so a root is located here
+            nZeros = nZeros + 1
+            
+            df = f(j) - f(j-1)
+            dx = x(j) - x(j-1)
+            
+            roots( min(nZeros,size(roots)) ) = x(j) - f(j) * dx / df
+         end if
+      end do
+            
+      if (present(Period)) then
+         if ((f(n) < 0 .and. f(1) >= 0) .or. (f(n) >= 0 .and. f(1) < 0)) then !this is a zero-crossing, so a root is located here
+            nZeros = nZeros + 1
+            
+            df = f(1) - f(n)
+            dx = x(1) - x(n) + Period
+            
+            roots( min(nZeros,size(roots)) ) = x(1) - f(1) * dx / df
+         end if
+      end if
+   
+   END SUBROUTINE fZero_R4
+!=======================================================================
+   SUBROUTINE fZero_R8(x, f, roots, nZeros, Period)
+      REAL(R8Ki),           intent(in)    :: x(:) ! assumed to be monotonic increasing: x(1) < x(2) < ... < x(n)
+      REAL(R8Ki),           intent(in)    :: f(:) ! f(x)
+      REAL(R8Ki),           intent(inout) :: roots(:)
+      INTEGER(IntKi),       intent(  out) :: nZeros
+      REAL(R8Ki), OPTIONAL, intent(in)    :: Period   ! if this is provided, the function f is assumed to be periodic with f(x(j)) = f(x(j)+Period)
+      
+      integer(IntKi)                :: n, j
+      real(R8Ki)                    :: dx, df, m ! help to find zero crossing
+      
+      n = size(f)
+      
+      nZeros = 0
+      do j=2,n
+         if ((f(j-1) < 0 .and. f(j) >= 0) .or. (f(j-1) >= 0 .and. f(j) < 0)) then !this is a zero-crossing, so a root is located here
+            nZeros = nZeros + 1
+            
+            df = f(j) - f(j-1)
+            dx = x(j) - x(j-1)
+            
+            roots( min(nZeros,size(roots)) ) = x(j) - f(j) * dx / df
+         end if
+      end do
+            
+      if (present(Period)) then
+         if ((f(n) < 0 .and. f(1) >= 0) .or. (f(n) >= 0 .and. f(1) < 0)) then !this is a zero-crossing, so a root is located here
+            nZeros = nZeros + 1
+            
+            df = f(1) - f(n)
+            dx = x(1) - x(n) + Period
+            
+            roots( min(nZeros,size(roots)) ) = x(1) - f(1) * dx / df
+         end if
+      end if
+   
+   END SUBROUTINE fZero_R8
+!=======================================================================
 END MODULE NWTC_Num
