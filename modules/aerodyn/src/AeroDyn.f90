@@ -741,6 +741,11 @@ endif
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
    call AllocAry( m%Vind_i, 3, p%NumBlNds, p%NumBlades, 'm%Vind_i', ErrStat2, ErrMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+   allocate(m%blds(p%NumBlades), Stat = ErrStat2)
+      if (ErrStat2 /= 0) then
+         call SetErrStat(ErrID_Fatal, "Error allocating m%blds.", errStat, errMsg, RoutineName)
+         return
+      end if  
 
          ! Variables for optimizing outputs at blade nodes
    do k=1,p%numBlades
