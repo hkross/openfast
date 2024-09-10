@@ -3646,23 +3646,13 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, twist, toe, cant, ErrS
       do j=1,p%NumBlNds
          m%orientationAnnulus(:,:,j,k) = u%BladeMotion(k)%Orientation(:,:,j)
       enddo
-      !if ( p_AD%Wake_Mod == WakeMod_DMST ) then **CHECK
-      !   tmp1 = EulerExtract( matmul(u%BladeRootMotion(1)%RefOrientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
-      !   do j=1,p%NumBlNds      
-      !      tmp2 = EulerExtract( matmul(u%BladeMotion(1)%Orientation(:,:,j), transpose(u%HubMotion%Orientation(:,:,1))) )   
-      !      m%DMST_u%PitchAndTwist(j,k) = tmp2(1) - tmp1(1)
-      !      if (present(toeBladeNds)) toeBladeNds(j,k) = 0.0_ReKi ! TODO
-      !      m%Curve(j,k) = 0.0_ReKi ! TODO
-      !   end do
-      !else
-         do j=1,p%NumBlNds
-            orientation = matmul( u%BladeMotion(k)%Orientation(:,:,j), transpose( m%orientationAnnulus(:,:,j,k) ) )
-            thetas = EulerExtract( orientation )
-            twist(j,k) = -thetas(3)
-            toe(  j,k) =  thetas(1)
-            cant( j,k) =  thetas(2)
-         enddo
-      !endif
+      do j=1,p%NumBlNds
+         orientation = matmul( u%BladeMotion(k)%Orientation(:,:,j), transpose( m%orientationAnnulus(:,:,j,k) ) )
+         thetas = EulerExtract( orientation )
+         twist(j,k) = -thetas(3)
+         toe(  j,k) =  thetas(1)
+         cant( j,k) =  thetas(2)
+      enddo
    end do !k=blades
       
 end subroutine Calculate_MeshOrientation_LiftingLine
@@ -3680,7 +3670,6 @@ subroutine SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat, errMsg)
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
    ! local variables
-   real(R8Ki)                              :: x_hat_disk(3)
    real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
    real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
    real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
@@ -3689,9 +3678,9 @@ subroutine SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat, errMsg)
    integer(intKi)                          :: k                                            ! Loop counter for blades
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
 
-      ! Get disk average values and orientations
-   call DiskAvgValues( p, u, RotInflow, m, x_hat_disk )
-   call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg ) ! sets m%orientationAnnulus, m%Curve
+   allocate(thetaBladeNds(p%NumBlNds, p%NumBlades))
+
+   call Calculate_MeshOrientation_LiftingLine( p, u, m, m%DMST_u%PitchAndTwist, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
    if (ErrStat >= AbortErrLev) return
       
       ! Free-stream velocity, m/s

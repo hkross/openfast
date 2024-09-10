@@ -524,10 +524,16 @@ CONTAINS
       ! Induced velocity in global
       ! FVW already return this, we do a simple copy from Wings to Blades
       do k=1,min(p%numBlades,3)
-         iW = p_AD%FVW%Bld2Wings(iRot, k)
-         do j=1,u%BladeMotion(k)%NNodes
-            m%Vind_i(:,j,k) = m_AD%FVW_y%W(iW)%Vind(1:3,j)
-         enddo
+         if ( p_AD%Wake_Mod == WakeMod_FVW ) then
+            iW=p_AD%FVW%Bld2Wings(iRot, k)
+            do j=1,u%BladeMotion(k)%NNodes
+               m%Vind_i(:,j,k) = m_AD%FVW_y%W(iW)%Vind(1:3,j)
+            enddo
+         elseif ( p_AD%Wake_Mod == WakeMod_DMST ) then
+            do j=1,u%BladeMotion(k)%NNodes
+               m%Vind_i(:,j,k) = m%DMST_y%Vind(1:3,j,k)
+            enddo
+         endif
       enddo
 
       ! TODO TODO TODO ALL THIS SHOULD BE COMPUTED IN THE SAME MEMORY FORMAT AS AERODYN
