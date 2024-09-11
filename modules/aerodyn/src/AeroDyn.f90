@@ -2879,7 +2879,7 @@ subroutine SetInputs(t, p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    elseif (p_AD%Wake_Mod == WakeMod_DMST) then
          ! This needs to extract the inputs from the AD data types (mesh) and massage them for the DMST module
-      call SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat2, errMsg2)
+      call SetInputsForDMST(p_AD, p, u, m, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    endif
 
@@ -3424,11 +3424,7 @@ subroutine DiskAvgValues(p, u, RotInflow, m, x_hat_disk, y_hat_disk, z_hat_disk,
       ! orientation vectors:
    x_hat_disk = u%HubMotion%Orientation(1,:,1) !actually also x_hat_hub
 
-   !if ( p_AD%Wake_Mod == WakeMod_DMST ) then **CHECK
-   !   m%V_dot_x = sqrt( dot_product( m%V_diskAvg, u%HubMotion%Orientation(2,:,1) )**2 + dot_product( m%V_diskAvg, u%HubMotion%Orientation(3,:,1) )**2 )
-   !else
-      m%V_dot_x  = dot_product( m%V_diskAvg, x_hat_disk )
-   !end if
+   m%V_dot_x  = dot_product( m%V_diskAvg, x_hat_disk )
    
    
    ! These values are not used in the Envision code base; stored here only for easier merging from OpenFAST:
@@ -3644,7 +3640,7 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, twist, toe, cant, ErrS
    
    do k=1,p%NumBlades
       do j=1,p%NumBlNds
-         m%orientationAnnulus(:,:,j,k) = u%BladeMotion(k)%Orientation(:,:,j)
+         m%orientationAnnulus(:,:,j,k) = u%BladeRootMotion(k)%Orientation(:,:,1)
       enddo
       do j=1,p%NumBlNds
          orientation = matmul( u%BladeMotion(k)%Orientation(:,:,j), transpose( m%orientationAnnulus(:,:,j,k) ) )
@@ -3658,12 +3654,11 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, twist, toe, cant, ErrS
 end subroutine Calculate_MeshOrientation_LiftingLine
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%DMST_u.
-subroutine SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat, errMsg)
+subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
 
    type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
-   TYPE(RotInflowType),     intent(in   )  :: RotInflow                       !< Rotor Inflow at time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
    real(R8Ki),              allocatable    :: thetaBladeNds(:,:)
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
@@ -3686,7 +3681,7 @@ subroutine SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat, errMsg)
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
       do i = 1,p%DMST%Nst
-         m%DMST_u%Vinf(:,i,j) = RotInflow%Blade(1)%InflowVel(:,j)
+         m%DMST_u%Vinf(:,i,j) = m%DisturbedInflow(:,j,k)
       end do
    end do
 
@@ -4053,8 +4048,8 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
 
                ! note: because force and moment are 1-d arrays, I'm calculating the transpose of the force and moment outputs
                !       so that I don't have to take the transpose of orientationAnnulus(:,:,j,k)
-            y%rotors(iR)%BladeLoad(k)%Force(:,j)  = matmul( force,  m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
-            y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
+            y%rotors(iR)%BladeLoad(k)%Force(:,j)  = matmul( force,  u%rotors(iR)%BladeMotion(k)%Orientation(:,:,j) )  ! force per unit length of the jth node in the kth blade
+            y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, u%rotors(iR)%BladeMotion(k)%Orientation(:,:,j) )  ! moment per unit length of the jth node in the kth blade
 
             ! Save results for outputs so we don't have to recalculate them all when we write outputs
             m%rotors(iR)%blds(k)%BN_AxInd(j)           = AxInd
@@ -4169,8 +4164,8 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          m%Mz(j,k) = moment(3)
          m%M(j,k) = moment(3)
 
-         y%BladeLoad(k)%force(:,j)  = matmul( transpose(m%orientationAnnulus(:,:,j,k)), force )  ! force per unit length of the jth node on the kth blade
-         y%BladeLoad(k)%moment(:,j) = matmul( transpose(m%orientationAnnulus(:,:,j,k)), moment )  ! moment per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%force(:,j)  = matmul( force,  u%BladeMotion(k)%Orientation(:,:,j) )  ! force per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%moment(:,j) = matmul( moment, u%BladeMotion(k)%Orientation(:,:,j) )  ! moment per unit length of the jth node on the kth blade
 
          ! Save results for outputs so we don't have to recalculate them all when we write outputs
          m%blds(k)%BN_AxInd(j)           = AxInd
@@ -4337,8 +4332,6 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, calcCrvAngle, ErrSt
       if ( InputFileData%Nst <= 0 ) call SetErrStat( ErrID_Fatal, 'Nst must be greater than 0.', ErrStat, ErrMsg, RoutineName )
 
       if ( InputFileData%DMSTRes <= 0 .or. InputFileData%DMSTRes > 0.5) call SetErrStat( ErrID_Fatal, 'DMSTRes cannot be less than or equal to 0 or greater than 0.5.', ErrStat, ErrMsg, RoutineName )
-
-      if ( InputFileData%UseBlCm ) call SetErrStat( ErrID_Fatal, 'Aerodynamic pitching moment cannot be used with DMST model.', ErrStat, ErrMsg, RoutineName )
 
       if ( InputFileData%NTwOuts > 0 ) call SetErrStat( ErrID_Fatal, 'NTwOuts cannot be greater than zero with DMST model.', ErrStat, ErrMsg, RoutineName )
 
