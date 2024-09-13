@@ -255,17 +255,17 @@ CONTAINS
          do beta=1,p%NBlOuts
             j=p%BlOutNd(beta)
 
-            tmp = matmul( m%orientationAnnulus(:,:,j,k), RotInflow%Blade(k)%InflowVel(:,j) )
+            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), RotInflow%Blade(k)%InflowVel(:,j) )
             m%AllOuts( BNVUndx(beta,k) ) = tmp(1)
             m%AllOuts( BNVUndy(beta,k) ) = tmp(2)
             m%AllOuts( BNVUndz(beta,k) ) = tmp(3)
 
-            tmp = matmul( m%orientationAnnulus(:,:,j,k), m%DisturbedInflow(:,j,k) )
+            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), m%DisturbedInflow(:,j,k) )
             m%AllOuts( BNVDisx(beta,k) ) = tmp(1)
             m%AllOuts( BNVDisy(beta,k) ) = tmp(2)
             m%AllOuts( BNVDisz(beta,k) ) = tmp(3)
 
-            tmp = matmul( m%orientationAnnulus(:,:,j,k), u%BladeMotion(k)%TranslationVel(:,j) )
+            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), u%BladeMotion(k)%TranslationVel(:,j) )
             m%AllOuts( BNSTVx( beta,k) ) = tmp(1)
             m%AllOuts( BNSTVy( beta,k) ) = tmp(2)
             m%AllOuts( BNSTVz( beta,k) ) = tmp(3)
@@ -2214,26 +2214,11 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
    end if
 
    if (p_AD%Wake_Mod == WakeMod_DMST) then
-      do i = 1,size(BNCurve,2)
-         InvalidOutput( BNCurve(:,i) ) = .true.
-      end do
       do i = 1,size(BNClrnc,2)
          InvalidOutput( BNClrnc(:,i) ) = .true.
       end do
       do i = 1,size(BNCpmin,2)
          InvalidOutput( BNCpmin(:,i) ) = .true.
-      end do
-      do i = 1,size(BNFx,2)
-         InvalidOutput( BNFx(:,i)    ) = .true.
-      end do
-      do i = 1,size(BNFy,2)
-         InvalidOutput( BNFy(:,i)    ) = .true.
-      end do
-      do i = 1,size(BNCx,2)
-         InvalidOutput( BNCx(:,i)    ) = .true.
-      end do
-      do i = 1,size(BNCy,2)
-         InvalidOutput( BNCy(:,i)    ) = .true.
       end do
       do i = 1,size(BNSigCr,2)
          InvalidOutput( BNSigCr(:,i) ) = .true.
@@ -2278,6 +2263,19 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( TFMyi    ) = .true.
       InvalidOutput( TFMzi    ) = .true.
       InvalidOutput( RtSkew   ) = .true.
+      InvalidOutput( DBEMTau1 ) = .true.
+      InvalidOutput( NcFdx    ) = .true.
+      InvalidOutput( NcFdy    ) = .true.
+      InvalidOutput( NcFdz    ) = .true.
+      InvalidOutput( NcMdx    ) = .true.
+      InvalidOutput( NcMdy    ) = .true.
+      InvalidOutput( NcMdz    ) = .true.
+      InvalidOutput( NcFxi    ) = .true.
+      InvalidOutput( NcFyi    ) = .true.
+      InvalidOutput( NcFzi    ) = .true.
+      InvalidOutput( NcMxi    ) = .true.
+      InvalidOutput( NcMyi    ) = .true.
+      InvalidOutput( NcMzi    ) = .true.
    end if
 
    if (.not. p%NacelleDrag) then  ! Invalid Nacelle Drag loads
