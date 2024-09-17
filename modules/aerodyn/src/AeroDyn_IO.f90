@@ -255,17 +255,29 @@ CONTAINS
          do beta=1,p%NBlOuts
             j=p%BlOutNd(beta)
 
-            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), RotInflow%Blade(k)%InflowVel(:,j) )
+            if ( p%AeroProjMod==APM_LiftingLine ) then
+               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), RotInflow%Blade(k)%InflowVel(:,j) )
+            else
+               tmp = matmul( m%orientationAnnulus(:,:,j,k), RotInflow%Blade(k)%InflowVel(:,j) )
+            end if
             m%AllOuts( BNVUndx(beta,k) ) = tmp(1)
             m%AllOuts( BNVUndy(beta,k) ) = tmp(2)
             m%AllOuts( BNVUndz(beta,k) ) = tmp(3)
 
-            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), m%DisturbedInflow(:,j,k) )
+            if ( p%AeroProjMod==APM_LiftingLine ) then
+               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), m%DisturbedInflow(:,j,k) )
+            else
+               tmp = matmul( m%orientationAnnulus(:,:,j,k), m%DisturbedInflow(:,j,k) )
+            end if
             m%AllOuts( BNVDisx(beta,k) ) = tmp(1)
             m%AllOuts( BNVDisy(beta,k) ) = tmp(2)
             m%AllOuts( BNVDisz(beta,k) ) = tmp(3)
 
-            tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), u%BladeMotion(k)%TranslationVel(:,j) )
+            if ( p%AeroProjMod==APM_LiftingLine ) then
+               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), u%BladeMotion(k)%TranslationVel(:,j) )
+            else
+               tmp = matmul( m%orientationAnnulus(:,:,j,k), u%BladeMotion(k)%TranslationVel(:,j) )
+            end if
             m%AllOuts( BNSTVx( beta,k) ) = tmp(1)
             m%AllOuts( BNSTVy( beta,k) ) = tmp(2)
             m%AllOuts( BNSTVz( beta,k) ) = tmp(3)
@@ -588,7 +600,7 @@ CONTAINS
             m%AllOuts( BNFd(   beta,k) ) =  m%X(j,k)*sp + m%Y(j,k)*cp
             m%AllOuts( BNMm(   beta,k) ) =  m%M(j,k)
             m%AllOuts( BNFx(   beta,k) ) =  m%X(j,k)
-            m%AllOuts( BNFy(   beta,k) ) =  m%Y(j,k)
+            m%AllOuts( BNFy(   beta,k) ) = -m%Y(j,k)
 
             m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)
             if ( p_AD%Wake_Mod == WakeMod_BEMT ) then

@@ -862,8 +862,8 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
 
          ! Normal force (to plane), tangential force (to plane)
          ! TODO deprecate
-         CASE ( BldNd_Fx ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = m%X(iNd,iB); iOut = iOut + 1; enddo;enddo 
-         CASE ( BldNd_Fy ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = m%Y(iNd,iB); iOut = iOut + 1; enddo;enddo 
+         CASE ( BldNd_Fx ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) =  m%X(iNd,iB); iOut = iOut + 1; enddo;enddo 
+         CASE ( BldNd_Fy ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = -m%Y(iNd,iB); iOut = iOut + 1; enddo;enddo 
 
             ! Normal force (to chord), and tangential force (to chord) per unit length
          !CASE( BldNd_Fn ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = dot_product( y%BladeLoad(iB)%Force (:, iNd), u%BladeMotion(iB)%Orientation(1,:,iNd)); iOut = iOut + 1; enddo;enddo 
