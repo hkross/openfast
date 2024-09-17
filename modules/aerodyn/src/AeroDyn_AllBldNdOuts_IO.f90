@@ -782,16 +782,6 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
                      iOut = iOut + 1
                   END DO
                END DO 
-            elseif (p_AD%Wake_Mod /= WakeMod_DMST) then
-               DO iB=1,nB
-                  iW = W2B(iB)
-                  do iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! cos(theta)
-                     st=sin(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! sin(theta)
-                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%blds(iB)%BN_Cx(iNd)*ct + m_AD%rotors(iRot)%blds(iB)%BN_Cy(iNd)*st
-                     iOut = iOut + 1
-                  END DO
-               END DO
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);                   
@@ -813,22 +803,12 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
                      iOut = iOut + 1
                   END DO
                END DO 
-            elseif (p_AD%Wake_Mod /= WakeMod_DMST) then
-               DO iB=1,nB
-                  iW = W2B(iB)
-                  do iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! cos(theta)
-                     st=sin(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! sin(theta)
-                     y%WriteOutput(iOut)  = -m_AD%rotors(iRot)%blds(iB)%BN_Cx(iNd)*st + m_AD%rotors(iRot)%blds(iB)%BN_Cy(iNd)*ct
-                     iOut = iOut + 1
-                  END DO
-               END DO
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);                   
                      cp=cos(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! cos(phi)
                      sp=sin(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! sin(phi)
-                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*cp - m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*sp
+                     y%WriteOutput(iOut)  = -m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*cp + m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*sp
                      iOut = iOut + 1
                   END DO
                END DO
@@ -882,8 +862,8 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
 
          ! Normal force (to plane), tangential force (to plane)
          ! TODO deprecate
-         CASE ( BldNd_Fx ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) =  m%X(iNd,iB); iOut = iOut + 1; enddo;enddo 
-         CASE ( BldNd_Fy ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = -m%Y(iNd,iB); iOut = iOut + 1; enddo;enddo 
+         CASE ( BldNd_Fx ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = m%X(iNd,iB); iOut = iOut + 1; enddo;enddo 
+         CASE ( BldNd_Fy ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = m%Y(iNd,iB); iOut = iOut + 1; enddo;enddo 
 
             ! Normal force (to chord), and tangential force (to chord) per unit length
          !CASE( BldNd_Fn ); do iB=1,nB; do iNdL=1,nNd; iNd=Nd(iNdL); y%WriteOutput(iOut) = dot_product( y%BladeLoad(iB)%Force (:, iNd), u%BladeMotion(iB)%Orientation(1,:,iNd)); iOut = iOut + 1; enddo;enddo 
@@ -893,16 +873,6 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
                   do iNdL=1,nNd; iNd=Nd(iNdL);   
                      ct=cos(m%BEMT_u(Indx)%theta(iNd,iB))
                      st=sin(m%BEMT_u(Indx)%theta(iNd,iB))
-                     y%WriteOutput(iOut)  = m%X(iNd,iB)*ct - m%Y(iNd,iB)*st
-                     iOut = iOut + 1
-                  END DO
-               END DO 
-            elseif (p_AD%Wake_Mod /= WakeMod_DMST) then
-               DO iB=1,nB
-                  iW = W2B(iB)
-                  do iNdL=1,nNd; iNd=Nd(iNdL);   
-                     ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! cos(theta)
-                     st=sin(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! sin(theta)
                      y%WriteOutput(iOut)  = m%X(iNd,iB)*ct - m%Y(iNd,iB)*st
                      iOut = iOut + 1
                   END DO
@@ -927,20 +897,10 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
                      iOut = iOut + 1
                   END DO
                END DO 
-            elseif (p_AD%Wake_Mod /= WakeMod_DMST) then
-               DO iB=1,nB
-                  iW = W2B(iB)
-                  do iNdL=1,nNd; iNd=Nd(iNdL);   
-                     ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! cos(theta)
-                     st=sin(m_AD%FVW%W(iW)%PitchAndTwist(iNd))    ! sin(theta)
-                     y%WriteOutput(iOut)  = -m%X(iNd,iB)*st - m%Y(iNd,iB)*ct
-                     iOut = iOut + 1
-                  END DO
-               END DO 
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);   
-                     y%WriteOutput(iOut)  = m%Y(iNd,iB)
+                     y%WriteOutput(iOut)  = -m%Y(iNd,iB)
                      iOut = iOut + 1
                   END DO
                END DO 
@@ -1572,11 +1532,11 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
    end if
 
       ! The following are valid only for BEMT/DBEMT
-   if (p_AD%Wake_Mod /= WakeMod_FVW) then
+   if (p_AD%Wake_Mod == WakeMod_BEMT) then
       InvalidOutput( BldNd_Cl_qs ) = .true.
       InvalidOutput( BldNd_Cd_qs ) = .true.
       InvalidOutput( BldNd_Cm_qs ) = .true.
-   else
+   elseif (p_AD%Wake_Mod == WakeMod_FVW) then
       ! The following are invalid for free vortex wake
       InvalidOutput( BldNd_Toe       ) = .true.
       InvalidOutput( BldNd_Chi       ) = .true.
@@ -1603,7 +1563,6 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
    end if
 
    if (p_AD%Wake_Mod == WakeMod_DMST) then
-      InvalidOutput( BldNd_Curve     ) = .true.
       InvalidOutput( BldNd_SigCr     ) = .true.
       InvalidOutput( BldNd_SgCav     ) = .true.
       InvalidOutput( BldNd_Fx        ) = .true.
@@ -1615,14 +1574,6 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( BldNd_GeomPhi   ) = .true.
       InvalidOutput( BldNd_Chi       ) = .true.
       InvalidOutput( BldNd_UA_Flag   ) = .true.
-      InvalidOutput( BldNd_UA_x1     ) = .true.
-      InvalidOutput( BldNd_UA_x2     ) = .true.
-      InvalidOutput( BldNd_UA_x3     ) = .true.
-      InvalidOutput( BldNd_UA_x4     ) = .true.
-      InvalidOutput( BldNd_UA_x5     ) = .true.
-      InvalidOutput( BldNd_Cl_qs     ) = .false.
-      InvalidOutput( BldNd_Cd_qs     ) = .false.
-      InvalidOutput( BldNd_Cm_qs     ) = .false.
    end if
    
 !   ................. End of validity checking .................

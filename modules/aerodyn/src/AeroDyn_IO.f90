@@ -577,27 +577,24 @@ CONTAINS
             cp=cos(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
             sp=sin(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
 
-            if ( p_AD%Wake_Mod == WakeMod_FVW ) then
-               ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! cos(theta)
-               st=sin(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! sin(theta)
-               m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*ct + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*st
-               m%AllOuts( BNCt(   beta,k) ) =-m_AD%rotors(iRot)%blds(k)%BN_Cx(j)*st + m_AD%rotors(iRot)%blds(k)%BN_Cy(j)*ct
-            else
-               m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sp
+            m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sp
+            if ( p_AD%Wake_Mod == WakeMod_BEMT ) then
                m%AllOuts( BNCt(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*cp - m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
+            else
+               m%AllOuts( BNCt(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
             endif
 
             m%AllOuts( BNFl(   beta,k) ) =  m%X(j,k)*cp - m%Y(j,k)*sp
             m%AllOuts( BNFd(   beta,k) ) =  m%X(j,k)*sp + m%Y(j,k)*cp
             m%AllOuts( BNMm(   beta,k) ) =  m%M(j,k)
             m%AllOuts( BNFx(   beta,k) ) =  m%X(j,k)
-            m%AllOuts( BNFy(   beta,k) ) = -m%Y(j,k)
-            if ( p_AD%Wake_Mod == WakeMod_FVW ) then
-               m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)*ct - m%Y(j,k)*st
-               m%AllOuts( BNFt(   beta,k) ) = -m%X(j,k)*st - m%Y(j,k)*ct
-            else
-               m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)
+            m%AllOuts( BNFy(   beta,k) ) =  m%Y(j,k)
+
+            m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)
+            if ( p_AD%Wake_Mod == WakeMod_BEMT ) then
                m%AllOuts( BNFt(   beta,k) ) =  m%Y(j,k)
+            else
+               m%AllOuts( BNFt(   beta,k) ) =  -m%Y(j,k)
             endif
 
             if ( p_AD%Wake_Mod == WakeMod_FVW ) then
@@ -2225,6 +2222,18 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       end do
       do i = 1,size(BNSgCav,2)
          InvalidOutput( BNSgCav(:,i) ) = .true.
+      end do
+      do i = 1,size(BNFx,2)
+         InvalidOutput( BNFx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNFy,2)
+         InvalidOutput( BNFy(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCx,2)
+         InvalidOutput( BNCx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCy,2)
+         InvalidOutput( BNCy(:,i)    ) = .true.
       end do
       do i = 1,size(TwNVUnd,1)
          InvalidOutput( TwNVUnd(i,:) ) = .true.

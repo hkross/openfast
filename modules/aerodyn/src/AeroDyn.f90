@@ -4030,12 +4030,12 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
             cp = cos(phi)
             sp = sin(phi)
             Cx = Cl_dyn*cp + Cd_dyn*sp
-            Cy = Cl_dyn*sp - Cd_dyn*cp
+            Cy = Cd_dyn*cp - Cl_dyn*sp
 
-            q = 0.5 * p%rotors(iR)%airDens * Vrel**2                ! dynamic pressure of the jth node in the kth blade
-            force(1) =  Cx * q * p%FVW%W(iW)%chord_LL(j)        ! X = normal force per unit length (normal to the plane, not chord) of the jth node in the kth blade
-            force(2) = -Cy * q * p%FVW%W(iW)%chord_LL(j)        ! Y = tangential force per unit length (tangential to the plane, not chord) of the jth node in the kth blade
-            moment(3)=  Cm_dyn * q * p%FVW%W(iW)%chord_LL(j)**2 ! M = pitching moment per unit length of the jth node in the kth blade
+            q = 0.5 * p%rotors(iR)%airDens * Vrel**2           ! dynamic pressure of the jth node in the kth blade
+            force(1) = Cx * q * p%FVW%W(iW)%chord_LL(j)        ! X = normal force per unit length (normal to the plane, not chord) of the jth node in the kth blade
+            force(2) = Cy * q * p%FVW%W(iW)%chord_LL(j)        ! Y = tangential force per unit length (tangential to the plane, not chord) of the jth node in the kth blade
+            moment(3)= Cm_dyn * q * p%FVW%W(iW)%chord_LL(j)**2 ! M = pitching moment per unit length of the jth node in the kth blade
 
                ! save these values for possible output later:
             m%rotors(iR)%X(j,k) = force(1)
@@ -5051,6 +5051,9 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
    type(DMST_InitOutputType)                     :: InitOut        ! Output for initialization routine                                           
    integer(intKi)                                :: j              ! Node index
    integer(intKi)                                :: k              ! Blade index
+   real(ReKi)                                    :: y_hat_disk(3)
+   real(ReKi)                                    :: z_hat_disk(3)
+   real(ReKi)                                    :: dr_gl(3)
    integer(IntKi)                                :: ErrStat2
    character(ErrMsgLen)                          :: ErrMsg2
    character(*), parameter                       :: RoutineName = 'Init_DMSTmodule'
@@ -5086,8 +5089,11 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
       end do
    end do
       
+   y_hat_disk = u_AD%HubMotion%Orientation(2,:,1)
+   z_hat_disk = u_AD%HubMotion%Orientation(3,:,1)
    do j=1,p%NumBlNds
-      InitInp%radius(j) = sqrt( (u_AD%BladeMotion(1)%Position(1,j)-u_AD%HubMotion%Position(1,1))**2 + (u_AD%BladeMotion(1)%Position(2,j)-u_AD%HubMotion%Position(2,1))**2 )
+      dr_gl =  u_AD%BladeMotion(1)%Position(:,j) - u_AD%HubMotion%Position(:,1) ! vector hub center to node j in global coord
+      InitInp%radius(j) = sqrt( dot_product(dr_gl, y_hat_disk)**2 + dot_product(dr_gl, z_hat_disk)**2 )
    end do
 
    if (ErrStat >= AbortErrLev) then
