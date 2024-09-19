@@ -145,7 +145,7 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%PitchAndTwist.', errStat, errMsg, RoutineName )
       return
    end if 
-   u%PitchAndTwist = 0.0_ReKi
+   u%PitchAndTwist = 0.0_R8Ki
 
    allocate ( u%Vinf(3_IntKi, p%Nst, p%numBladeNodes), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
