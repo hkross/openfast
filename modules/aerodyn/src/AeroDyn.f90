@@ -3626,8 +3626,6 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, twist, toe, cant, ErrS
    real(ReKi),              intent(  out)  :: cant(p%NumBlNds,p%NumBlades)
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
-   real(R8Ki)                              :: tmp1(3)
-   real(R8Ki)                              :: tmp2(3)
    real(R8Ki)                              :: thetas(3)
    real(R8Ki)                              :: orientation(3,3)
    integer(intKi)                          :: j                      ! loop counter for nodes
@@ -4048,13 +4046,8 @@ subroutine SetOutputsFromFVW(t, u, p, OtherState, x, xd, m, y, ErrStat, ErrMsg)
 
                ! note: because force and moment are 1-d arrays, I'm calculating the transpose of the force and moment outputs
                !       so that I don't have to take the transpose of orientationAnnulus(:,:,j,k)
-            if ( p%rotors(iR)%AeroProjMod==APM_LiftingLine ) then
-               y%rotors(iR)%BladeLoad(k)%Force(:,j)  = matmul( force,  u%rotors(iR)%BladeMotion(k)%Orientation(:,:,j) )  ! force per unit length of the jth node in the kth blade
-               y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, u%rotors(iR)%BladeMotion(k)%Orientation(:,:,j) )  ! moment per unit length of the jth node in the kth blade
-            else
-               y%rotors(iR)%BladeLoad(k)%Force(:,j)  = matmul( force,  m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
-               y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
-            end if
+            y%rotors(iR)%BladeLoad(k)%Force(:,j)  = matmul( force,  m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
+            y%rotors(iR)%BladeLoad(k)%Moment(:,j) = matmul( moment, m%rotors(iR)%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
 
             ! Save results for outputs so we don't have to recalculate them all when we write outputs
             m%rotors(iR)%blds(k)%BN_AxInd(j)           = AxInd
@@ -4169,8 +4162,8 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          m%Mz(j,k) = moment(3)
          m%M(j,k) = moment(3)
 
-         y%BladeLoad(k)%force(:,j)  = matmul( force,  u%BladeMotion(k)%Orientation(:,:,j) )  ! force per unit length of the jth node on the kth blade
-         y%BladeLoad(k)%moment(:,j) = matmul( moment, u%BladeMotion(k)%Orientation(:,:,j) )  ! moment per unit length of the jth node on the kth blade
+         y%BladeLoad(k)%Force(:,j)  = matmul( force,  m%orientationAnnulus(:,:,j,k) )  ! force per unit length of the jth node in the kth blade
+         y%BladeLoad(k)%Moment(:,j) = matmul( moment, m%orientationAnnulus(:,:,j,k) )  ! moment per unit length of the jth node in the kth blade
 
          ! Save results for outputs so we don't have to recalculate them all when we write outputs
          m%blds(k)%BN_AxInd(j)           = AxInd
@@ -4186,6 +4179,8 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
          m%blds(k)%BN_Cl(j)              = Cl_dyn
          m%blds(k)%BN_Cd(j)              = Cd_dyn
          m%blds(k)%BN_Cm(j)              = Cm_dyn
+         m%blds(k)%BN_Cx(j)              = Cx
+         m%blds(k)%BN_Cy(j)              = Cy
       end do !j=nodes
    end do !k=blades
    

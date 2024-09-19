@@ -292,6 +292,8 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
    CHARACTER(*), PARAMETER                      :: RoutineName = 'Calc_WriteAllBldNdOutput'
    REAL(ReKi)                                   :: ct, st                  ! cosine, sine of theta
    REAL(ReKi)                                   :: cp, sp                  ! cosine, sine of phi
+   REAL(ReKi)                                   :: ca, sa                  ! cosine, sine of alpha
+   REAL(ReKi)                                   :: Fl, Fd
    real(ReKi)                                   :: R_ph(3,3)               ! Transformation from polar to hub (azimuth rotation along x hub)
    real(ReKi)                                   :: R_pi(3,3,p%NumBlades)   ! Transformation from inertial to polar (same x at hub coordinate system, blade-azimuth rotated)
    real(ReKi)                                   :: psi_hub                 ! Azimuth wrt hub
@@ -765,7 +767,7 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
             else
                DO iB=1,nB
                   do iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%blds(iB)%BN_Cy(iNd)
+                     y%WriteOutput(iOut)  = -m_AD%rotors(iRot)%blds(iB)%BN_Cy(iNd)
                      iOut = iOut + 1
                   END DO
                END DO
@@ -785,9 +787,9 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     cp=cos(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! cos(phi)
-                     sp=sin(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! sin(phi)
-                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*cp + m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*sp
+                     ca=cos(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! cos(alpha)
+                     sa=sin(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! sin(alpha)
+                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*ca + m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*sa
                      iOut = iOut + 1
                   END DO
                END DO
@@ -806,9 +808,9 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     cp=cos(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! cos(phi)
-                     sp=sin(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))    ! sin(phi)
-                     y%WriteOutput(iOut)  = -m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*cp + m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*sp
+                     ca=cos(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! cos(alpha)
+                     sa=sin(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! sin(alpha)
+                     y%WriteOutput(iOut)  = -m_AD%rotors(iRot)%blds(iB)%BN_Cd(iNd)*ca + m_AD%rotors(iRot)%blds(iB)%BN_Cl(iNd)*sa
                      iOut = iOut + 1
                   END DO
                END DO
@@ -879,8 +881,15 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
                END DO 
             else
                DO iB=1,nB
-                  DO iNdL=1,nNd; iNd=Nd(iNdL);   
-                     y%WriteOutput(iOut)  = m%X(iNd,iB)
+                  DO iNdL=1,nNd; iNd=Nd(iNdL); 
+                     cp=cos(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))
+                     sp=sin(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))
+                     Fl=m%X(iNd,iB)*cp - m%Y(iNd,iB)*sp
+                     Fd=m%X(iNd,iB)*sp + m%Y(iNd,iB)*cp
+
+                     ca=cos(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! cos(alpha)
+                     sa=sin(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! sin(alpha)
+                     y%WriteOutput(iOut)  = Fl*ca + Fd*sa
                      iOut = iOut + 1
                   END DO
                END DO
@@ -900,7 +909,14 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);   
-                     y%WriteOutput(iOut)  = -m%Y(iNd,iB)
+                     cp=cos(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))
+                     sp=sin(m_AD%rotors(iRot)%blds(iB)%BN_phi(iNd))
+                     Fl=m%X(iNd,iB)*cp - m%Y(iNd,iB)*sp
+                     Fd=m%X(iNd,iB)*sp + m%Y(iNd,iB)*cp
+
+                     ca=cos(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! cos(alpha)
+                     sa=sin(m_AD%rotors(iRot)%blds(iB)%BN_alpha(iNd))    ! sin(alpha)
+                     y%WriteOutput(iOut)  = -Fd*ca + Fl*sa
                      iOut = iOut + 1
                   END DO
                END DO 
@@ -1574,6 +1590,19 @@ SUBROUTINE BldNdOuts_SetOutParam(BldNd_OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( BldNd_GeomPhi   ) = .true.
       InvalidOutput( BldNd_Chi       ) = .true.
       InvalidOutput( BldNd_UA_Flag   ) = .true.
+      InvalidOutput( BldNd_Vundx     ) = .true.
+      InvalidOutput( BldNd_Vundy     ) = .true.
+      InvalidOutput( BldNd_Vundz     ) = .true.
+      InvalidOutput( BldNd_Vdisx     ) = .true.
+      InvalidOutput( BldNd_Vdisy     ) = .true.
+      InvalidOutput( BldNd_Vdisz     ) = .true.
+      InvalidOutput( BldNd_STVx      ) = .true.
+      InvalidOutput( BldNd_STVy      ) = .true.
+      InvalidOutput( BldNd_STVz      ) = .true.
+      InvalidOutput( BldNd_Vindx     ) = .true.
+      InvalidOutput( BldNd_Vindy     ) = .true.
+      InvalidOutput( BldNd_Vx        ) = .true.
+      InvalidOutput( BldNd_Vy        ) = .true.
    end if
    
 !   ................. End of validity checking .................

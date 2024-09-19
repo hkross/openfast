@@ -114,6 +114,8 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, RotInflow, x, m, m_AD, y, OtherState, x
    REAL(ReKi)                                   :: denom, rmax, omega
    REAL(ReKi)                                   :: ct, st ! cosine, sine of theta
    REAL(ReKi)                                   :: cp, sp ! cosine, sine of phi
+   REAL(ReKi)                                   :: ca, sa ! cosine, sine of alpha
+   REAL(ReKi)                                   :: Fl, Fd
       
    
       ! start routine:
@@ -255,29 +257,17 @@ CONTAINS
          do beta=1,p%NBlOuts
             j=p%BlOutNd(beta)
 
-            if ( p%AeroProjMod==APM_LiftingLine ) then
-               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), RotInflow%Blade(k)%InflowVel(:,j) )
-            else
-               tmp = matmul( m%orientationAnnulus(:,:,j,k), RotInflow%Blade(k)%InflowVel(:,j) )
-            end if
+            tmp = matmul( m%orientationAnnulus(:,:,j,k), RotInflow%Blade(k)%InflowVel(:,j) )
             m%AllOuts( BNVUndx(beta,k) ) = tmp(1)
             m%AllOuts( BNVUndy(beta,k) ) = tmp(2)
             m%AllOuts( BNVUndz(beta,k) ) = tmp(3)
 
-            if ( p%AeroProjMod==APM_LiftingLine ) then
-               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), m%DisturbedInflow(:,j,k) )
-            else
-               tmp = matmul( m%orientationAnnulus(:,:,j,k), m%DisturbedInflow(:,j,k) )
-            end if
+            tmp = matmul( m%orientationAnnulus(:,:,j,k), m%DisturbedInflow(:,j,k) )
             m%AllOuts( BNVDisx(beta,k) ) = tmp(1)
             m%AllOuts( BNVDisy(beta,k) ) = tmp(2)
             m%AllOuts( BNVDisz(beta,k) ) = tmp(3)
 
-            if ( p%AeroProjMod==APM_LiftingLine ) then
-               tmp = matmul( u%BladeMotion(k)%Orientation(:,:,j), u%BladeMotion(k)%TranslationVel(:,j) )
-            else
-               tmp = matmul( m%orientationAnnulus(:,:,j,k), u%BladeMotion(k)%TranslationVel(:,j) )
-            end if
+            tmp = matmul( m%orientationAnnulus(:,:,j,k), u%BladeMotion(k)%TranslationVel(:,j) )
             m%AllOuts( BNSTVx( beta,k) ) = tmp(1)
             m%AllOuts( BNSTVy( beta,k) ) = tmp(2)
             m%AllOuts( BNSTVz( beta,k) ) = tmp(3)
@@ -408,11 +398,7 @@ CONTAINS
       
          m%AllOuts( RtAeroCp ) = m%AllOuts( RtAeroPwr ) / (denom * m%V_dot_x)
          m%AllOuts( RtAeroCq ) = m%AllOuts( RtAeroMxh ) / (denom * rmax )
-         if ( p_AD%Wake_Mod == WakeMod_DMST ) then
-            m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxi ) /  denom
-         else
-            m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxh ) /  denom
-         end if
+         m%AllOuts( RtAeroCt ) = m%AllOuts( RtAeroFxh ) /  denom
       end if
       
 
@@ -584,17 +570,15 @@ CONTAINS
             m%AllOuts( BNCd(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cd(j)
             m%AllOuts( BNCm(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cm(j)
             m%AllOuts( BNCx(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)
-            m%AllOuts( BNCy(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cy(j)
+            m%AllOuts( BNCy(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cy(j)
 
             cp=cos(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
             sp=sin(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
+            ca=cos(m_AD%rotors(iRot)%blds(k)%BN_alpha(j))
+            sa=sin(m_AD%rotors(iRot)%blds(k)%BN_alpha(j))
 
-            m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sp
-            if ( p_AD%Wake_Mod == WakeMod_BEMT ) then
-               m%AllOuts( BNCt(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*cp - m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
-            else
-               m%AllOuts( BNCt(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*cp + m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
-            endif
+            m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*ca + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sa
+            m%AllOuts( BNCt(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*ca + m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
 
             m%AllOuts( BNFl(   beta,k) ) =  m%X(j,k)*cp - m%Y(j,k)*sp
             m%AllOuts( BNFd(   beta,k) ) =  m%X(j,k)*sp + m%Y(j,k)*cp
@@ -602,12 +586,10 @@ CONTAINS
             m%AllOuts( BNFx(   beta,k) ) =  m%X(j,k)
             m%AllOuts( BNFy(   beta,k) ) = -m%Y(j,k)
 
-            m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)
-            if ( p_AD%Wake_Mod == WakeMod_BEMT ) then
-               m%AllOuts( BNFt(   beta,k) ) =  m%Y(j,k)
-            else
-               m%AllOuts( BNFt(   beta,k) ) =  -m%Y(j,k)
-            endif
+            Fl=m%X(j,k)*cp - m%Y(j,k)*sp
+            Fd=m%X(j,k)*sp + m%Y(j,k)*cp
+            m%AllOuts( BNFn(   beta,k) )  = Fl*ca + Fd*sa
+            m%AllOuts( BNFt(   beta,k) )  = -Fd*ca + Fl*sa
 
             if ( p_AD%Wake_Mod == WakeMod_FVW ) then
                m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
@@ -2223,6 +2205,39 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
    end if
 
    if (p_AD%Wake_Mod == WakeMod_DMST) then
+      do i = 1,size(BNVundx,2)
+         InvalidOutput( BNVundx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVundy,2)
+         InvalidOutput( BNVundy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVundz,2)
+         InvalidOutput( BNVundz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisx,2)
+         InvalidOutput( BNVdisx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisy,2)
+         InvalidOutput( BNVdisy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisz,2)
+         InvalidOutput( BNVdisz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVx,2)
+         InvalidOutput( BNSTVx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVy,2)
+         InvalidOutput( BNSTVy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVz,2)
+         InvalidOutput( BNSTVz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVindx,2)
+         InvalidOutput( BNVindx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVindy,2)
+         InvalidOutput( BNVindy(:,i) ) = .true.
+      end do
       do i = 1,size(BNClrnc,2)
          InvalidOutput( BNClrnc(:,i) ) = .true.
       end do
