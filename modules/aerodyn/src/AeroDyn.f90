@@ -3658,7 +3658,6 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
-   real(R8Ki),              allocatable    :: thetaBladeNds(:,:)
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
@@ -3666,6 +3665,7 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
    real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
    real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
    real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
+   real(R8Ki), allocatable                 :: thetaBladeNds(:,:)
    integer(intKi)                          :: i                                            ! Loop counter for streamtubes
    integer(intKi)                          :: j                                            ! Loop counter for nodes
    integer(intKi)                          :: k                                            ! Loop counter for blades
@@ -3676,6 +3676,7 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
    call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
    if (ErrStat >= AbortErrLev) return
    m%DMST_u%PitchAndTwist = thetaBladeNds
+   if (allocated(thetaBladeNds)) deallocate(thetaBladeNds)
 
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
@@ -4102,7 +4103,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    real(ReKi)                               :: Vind(3)
    real(ReKi)                               :: Vstr(3)
    real(ReKi)                               :: Vwnd(3)
-   real(R8Ki)                               :: theta
+   real(ReKi)                               :: theta
 
    ! Local variables stored in misc for nodal outputs
    real(ReKi)                               :: AxInd, TanInd, Vrel, phi, alpha, Re
