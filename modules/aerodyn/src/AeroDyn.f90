@@ -3673,9 +3673,10 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
 
    allocate(thetaBladeNds(p%NumBlNds, p%NumBlades))
 
-   call Calculate_MeshOrientation_LiftingLine( p, u, m, m%DMST_u%PitchAndTwist, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
+   call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
    if (ErrStat >= AbortErrLev) return
-      
+   m%DMST_u%PitchAndTwist = thetaBladeNds
+
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
       do i = 1,p%DMST%Nst
@@ -4101,7 +4102,7 @@ subroutine SetOutputsFromDMST(u, p, p_AD, m, y, ErrStat, ErrMsg)
    real(ReKi)                               :: Vind(3)
    real(ReKi)                               :: Vstr(3)
    real(ReKi)                               :: Vwnd(3)
-   real(ReKi)                               :: theta
+   real(R8Ki)                               :: theta
 
    ! Local variables stored in misc for nodal outputs
    real(ReKi)                               :: AxInd, TanInd, Vrel, phi, alpha, Re
