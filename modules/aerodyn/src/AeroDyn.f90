@@ -3681,7 +3681,7 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
       ! Free-stream velocity, m/s
    do j = 1,p%NumBlNds
       do i = 1,p%DMST%Nst
-         m%DMST_u%Vinf(:,i,j) = m%DisturbedInflow(:,j,k)
+         m%DMST_u%Vinf(:,i,j) = m%DisturbedInflow(:,j,1)
       end do
    end do
 

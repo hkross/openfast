@@ -474,7 +474,6 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
    real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Vrel        ! Relative velocity
    real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Reb         ! Blade Reynolds number
    real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: alpha       ! Angle of attack
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: phi         ! Inflow angle
    real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Cn          ! Normal force coefficient on the blade
    real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Ct          ! Tangential force coefficient on the blade
    integer(IntKi)                                                  :: i           ! Loops through induction factors
@@ -495,9 +494,8 @@ subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
             Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
             alpha(i,j,k) = -atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) - u%PitchAndTwist(k,1) ! angle of attack
             call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
-            phi(i,j,k) = alpha(i,j,k) + u%PitchAndTwist(k,1) ! inflow angle
-            Cn(i,j,k) = AFI_interp%Cd*sin(phi(i,j,k)) + AFI_interp%Cl*cos(phi(i,j,k)) ! normal force coefficient on the blade
-            Ct(i,j,k) = AFI_interp%Cd*cos(phi(i,j,k)) - AFI_interp%Cl*sin(phi(i,j,k)) ! tangential force coefficient on the blade
+            Cn(i,j,k) = AFI_interp%Cd*sin(alpha(i,j,k)) + AFI_interp%Cl*cos(alpha(i,j,k)) ! normal to chord force coefficient on the blade, positive inwards towards rotation axis
+            Ct(i,j,k) = AFI_interp%Cd*cos(alpha(i,j,k)) - AFI_interp%Cl*sin(alpha(i,j,k)) ! tangential to chord force coefficient on the blade, positive towards trailing edge
             CTbe(i,j,k) = Ct(i,j,k)*cos(p%theta_st(n,k)) - Cn(i,j,k)*sin(p%theta_st(n,k)) ! thrust coefficient from blade element theory
          end do
       end do
