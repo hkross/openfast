@@ -2879,7 +2879,7 @@ subroutine SetInputs(t, p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    elseif (p_AD%Wake_Mod == WakeMod_DMST) then
          ! This needs to extract the inputs from the AD data types (mesh) and massage them for the DMST module
-      call SetInputsForDMST(p_AD, p, u, m, errStat2, errMsg2)
+      call SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat2, errMsg2)
          call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    endif
 
@@ -3652,16 +3652,18 @@ subroutine Calculate_MeshOrientation_LiftingLine(p, u, m, twist, toe, cant, ErrS
 end subroutine Calculate_MeshOrientation_LiftingLine
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%DMST_u.
-subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
+subroutine SetInputsForDMST(p_AD, p, u, RotInflow, m, errStat, errMsg)
 
    type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
+   type(RotInflowType),     intent(in   )  :: RotInflow                       !< Rotor inflow at time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
    ! local variables
+   real(R8Ki)                              :: x_hat_disk(3)
    real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
    real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
    real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
@@ -3672,6 +3674,9 @@ subroutine SetInputsForDMST(p_AD, p, u, m, errStat, errMsg)
    character(*), parameter                 :: RoutineName = 'SetInputsForDMST'
 
    allocate(thetaBladeNds(p%NumBlNds, p%NumBlades))
+
+      ! Get disk average values and orientations
+   call DiskAvgValues(p, u, RotInflow, m, x_hat_disk)
 
    call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
    if (ErrStat >= AbortErrLev) return

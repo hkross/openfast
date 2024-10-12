@@ -2299,6 +2299,10 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( TFMyi    ) = .true.
       InvalidOutput( TFMzi    ) = .true.
       InvalidOutput( RtSkew   ) = .true.
+      InvalidOutput( RtTSR    ) = .true.
+      InvalidOutput( RtAeroCp ) = .true.
+      InvalidOutput( RtAeroCq ) = .true.
+      InvalidOutput( RtAeroCt ) = .true.
       InvalidOutput( DBEMTau1 ) = .true.
       InvalidOutput( NcFdx    ) = .true.
       InvalidOutput( NcFdy    ) = .true.
