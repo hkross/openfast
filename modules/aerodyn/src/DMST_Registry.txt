@@ -26,7 +26,7 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
-typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m                 
+typedef   ^                            ^                             ReKi                     radius                          {:}{:}     -          -          "Rotor radius" m                 
 #
 # Define outputs from the initialization routine here:
 #
@@ -45,9 +45,9 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
-typedef   ^                            ^                             ReKi                     radius                          {:}        -          -          "Rotor radius" m
+typedef   ^                            ^                             ReKi                     radius                          {:}{:}     -          -          "Rotor radius" m
 typedef   ^                            ^                             ReKi                     dTheta                          {:}        -          -          "Total streamtube angle" rad
-typedef   ^                            ^                             ReKi                     theta_st                        {:}{:}     -          -          "Azimuthal position of streamtube midpoint" rad
+typedef   ^                            ^                             ReKi                     theta_st                        {:}        -          -          "Azimuthal position of streamtube midpoint" rad
 typedef   ^                            ^                             ReKi                     indf                            {:}        -          -          "Induction factor initial guess array" -
 #
 # ..... Inputs ....................................................................................................................

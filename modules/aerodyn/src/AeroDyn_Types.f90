@@ -351,7 +351,7 @@ IMPLICIT NONE
     TYPE(BEMT_OutputType)  :: BEMT_y      !< Outputs from the BEMT module [-]
     TYPE(BEMT_InputType) , DIMENSION(1:2)  :: BEMT_u      !< Inputs to the BEMT module [-]
     TYPE(DMST_OutputType)  :: DMST_y      !< Outputs from the DMST module [-]
-    TYPE(DMST_InputType)  :: DMST_u      !< Inputs to the DMST module [-]
+    TYPE(DMST_InputType) , DIMENSION(1:2)  :: DMST_u      !< Inputs to the DMST module [-]
     TYPE(AA_MiscVarType)  :: AA      !< MiscVars from the AA module [-]
     TYPE(AA_OutputType)  :: AA_y      !< Outputs from the AA module [-]
     TYPE(AA_InputType)  :: AA_u      !< Inputs to the AA module [-]
@@ -3468,9 +3468,13 @@ subroutine AD_CopyRotMiscVarType(SrcRotMiscVarTypeData, DstRotMiscVarTypeData, C
    call DMST_CopyOutput(SrcRotMiscVarTypeData%DMST_y, DstRotMiscVarTypeData%DMST_y, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
-   call DMST_CopyInput(SrcRotMiscVarTypeData%DMST_u, DstRotMiscVarTypeData%DMST_u, CtrlCode, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   if (ErrStat >= AbortErrLev) return
+   LB(1:1) = lbound(SrcRotMiscVarTypeData%DMST_u, kind=B8Ki)
+   UB(1:1) = ubound(SrcRotMiscVarTypeData%DMST_u, kind=B8Ki)
+   do i1 = LB(1), UB(1)
+      call DMST_CopyInput(SrcRotMiscVarTypeData%DMST_u(i1), DstRotMiscVarTypeData%DMST_u(i1), CtrlCode, ErrStat2, ErrMsg2)
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+      if (ErrStat >= AbortErrLev) return
+   end do
    call AA_CopyMisc(SrcRotMiscVarTypeData%AA, DstRotMiscVarTypeData%AA, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -4034,8 +4038,12 @@ subroutine AD_DestroyRotMiscVarType(RotMiscVarTypeData, ErrStat, ErrMsg)
    end do
    call DMST_DestroyOutput(RotMiscVarTypeData%DMST_y, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
-   call DMST_DestroyInput(RotMiscVarTypeData%DMST_u, ErrStat2, ErrMsg2)
-   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   LB(1:1) = lbound(RotMiscVarTypeData%DMST_u, kind=B8Ki)
+   UB(1:1) = ubound(RotMiscVarTypeData%DMST_u, kind=B8Ki)
+   do i1 = LB(1), UB(1)
+      call DMST_DestroyInput(RotMiscVarTypeData%DMST_u(i1), ErrStat2, ErrMsg2)
+      call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   end do
    call AA_DestroyMisc(RotMiscVarTypeData%AA, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call AA_DestroyOutput(RotMiscVarTypeData%AA_y, ErrStat2, ErrMsg2)
@@ -4229,7 +4237,11 @@ subroutine AD_PackRotMiscVarType(RF, Indata)
       call BEMT_PackInput(RF, InData%BEMT_u(i1)) 
    end do
    call DMST_PackOutput(RF, InData%DMST_y) 
-   call DMST_PackInput(RF, InData%DMST_u) 
+   LB(1:1) = lbound(InData%DMST_u, kind=B8Ki)
+   UB(1:1) = ubound(InData%DMST_u, kind=B8Ki)
+   do i1 = LB(1), UB(1)
+      call DMST_PackInput(RF, InData%DMST_u(i1)) 
+   end do
    call AA_PackMisc(RF, InData%AA) 
    call AA_PackOutput(RF, InData%AA_y) 
    call AA_PackInput(RF, InData%AA_u) 
@@ -4373,7 +4385,11 @@ subroutine AD_UnPackRotMiscVarType(RF, OutData)
       call BEMT_UnpackInput(RF, OutData%BEMT_u(i1)) ! BEMT_u 
    end do
    call DMST_UnpackOutput(RF, OutData%DMST_y) ! DMST_y 
-   call DMST_UnpackInput(RF, OutData%DMST_u) ! DMST_u 
+   LB(1:1) = lbound(OutData%DMST_u, kind=B8Ki)
+   UB(1:1) = ubound(OutData%DMST_u, kind=B8Ki)
+   do i1 = LB(1), UB(1)
+      call DMST_UnpackInput(RF, OutData%DMST_u(i1)) ! DMST_u 
+   end do
    call AA_UnpackMisc(RF, OutData%AA) ! AA 
    call AA_UnpackOutput(RF, OutData%AA_y) ! AA_y 
    call AA_UnpackInput(RF, OutData%AA_u) ! AA_u 

@@ -561,7 +561,7 @@ CONTAINS
             if ( p_AD%Wake_Mod == WakeMod_FVW ) then
                m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
             else
-               m%AllOuts( BNTheta(beta,k) ) = m_AD%rotors(iRot)%DMST_u%PitchAndTwist(j,k)*R2D
+               m%AllOuts( BNTheta(beta,k) ) = m_AD%rotors(iRot)%DMST_u(indx)%PitchAndTwist(j,k)*R2D
             endif
             m%AllOuts( BNPhi(  beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_phi(j)*R2D
 

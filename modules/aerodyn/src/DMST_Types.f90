@@ -45,7 +45,7 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DMSTMod = 0_IntKi      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst = 0_IntKi      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes = 0.0_ReKi      !< Resolution of induction factor initial guess array [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: radius      !< Rotor radius [m]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: radius      !< Rotor radius [m]
   END TYPE DMST_InitInputType
 ! =======================
 ! =========  DMST_InitOutputType  =======
@@ -65,9 +65,9 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DMSTMod = 0_IntKi      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst = 0_IntKi      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes = 0.0_ReKi      !< Resolution of induction factor initial guess array [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: radius      !< Rotor radius [m]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: radius      !< Rotor radius [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dTheta      !< Total streamtube angle [rad]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: theta_st      !< Azimuthal position of streamtube midpoint [rad]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: theta_st      !< Azimuthal position of streamtube midpoint [rad]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: indf      !< Induction factor initial guess array [-]
   END TYPE DMST_ParameterType
 ! =======================
@@ -130,10 +130,10 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    DstInitInputData%Nst = SrcInitInputData%Nst
    DstInitInputData%DMSTRes = SrcInitInputData%DMSTRes
    if (allocated(SrcInitInputData%radius)) then
-      LB(1:1) = lbound(SrcInitInputData%radius, kind=B8Ki)
-      UB(1:1) = ubound(SrcInitInputData%radius, kind=B8Ki)
+      LB(1:2) = lbound(SrcInitInputData%radius, kind=B8Ki)
+      UB(1:2) = ubound(SrcInitInputData%radius, kind=B8Ki)
       if (.not. allocated(DstInitInputData%radius)) then
-         allocate(DstInitInputData%radius(LB(1):UB(1)), stat=ErrStat2)
+         allocate(DstInitInputData%radius(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
             call SetErrStat(ErrID_Fatal, 'Error allocating DstInitInputData%radius.', ErrStat, ErrMsg, RoutineName)
             return
@@ -289,10 +289,10 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%Nst = SrcParamData%Nst
    DstParamData%DMSTRes = SrcParamData%DMSTRes
    if (allocated(SrcParamData%radius)) then
-      LB(1:1) = lbound(SrcParamData%radius, kind=B8Ki)
-      UB(1:1) = ubound(SrcParamData%radius, kind=B8Ki)
+      LB(1:2) = lbound(SrcParamData%radius, kind=B8Ki)
+      UB(1:2) = ubound(SrcParamData%radius, kind=B8Ki)
       if (.not. allocated(DstParamData%radius)) then
-         allocate(DstParamData%radius(LB(1):UB(1)), stat=ErrStat2)
+         allocate(DstParamData%radius(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
             call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%radius.', ErrStat, ErrMsg, RoutineName)
             return
@@ -313,10 +313,10 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%dTheta = SrcParamData%dTheta
    end if
    if (allocated(SrcParamData%theta_st)) then
-      LB(1:2) = lbound(SrcParamData%theta_st, kind=B8Ki)
-      UB(1:2) = ubound(SrcParamData%theta_st, kind=B8Ki)
+      LB(1:1) = lbound(SrcParamData%theta_st, kind=B8Ki)
+      UB(1:1) = ubound(SrcParamData%theta_st, kind=B8Ki)
       if (.not. allocated(DstParamData%theta_st)) then
-         allocate(DstParamData%theta_st(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         allocate(DstParamData%theta_st(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
             call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%theta_st.', ErrStat, ErrMsg, RoutineName)
             return

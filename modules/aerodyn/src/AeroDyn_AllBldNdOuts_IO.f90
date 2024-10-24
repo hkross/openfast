@@ -644,7 +644,7 @@ SUBROUTINE Calc_WriteAllBldNdOutput( p, p_AD, u, m, m_AD, x, y, OtherState, RotI
             else
                DO iB=1,nB
                   DO iNdL=1,nNd; iNd=Nd(iNdL);                   
-                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%DMST_u%PitchAndTwist(iNd,iB)*R2D
+                     y%WriteOutput(iOut)  = m_AD%rotors(iRot)%DMST_u(indx)%PitchAndTwist(iNd,iB)*R2D
                      iOut = iOut + 1
                   END DO
                END DO

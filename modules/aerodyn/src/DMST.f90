@@ -34,7 +34,7 @@ module DMST
 
    public :: DMST_Init                           ! Initialization routine
 !   public :: DMST_End                            ! Ending routine (includes clean up)
-!   public :: DMST_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete states
+   public :: DMST_UpdateStates                   ! Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete states
    public :: DMST_CalcOutput                     ! Routine for computing outputs
 
    contains
@@ -79,7 +79,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   allocate ( p%radius(p%numBladeNodes), STAT = errStat2 )
+   allocate ( p%radius(p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%radius.', errStat, errMsg, RoutineName )
       return
@@ -91,7 +91,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   allocate ( p%theta_st(2_IntKi*p%Nst, p%numBladeNodes), STAT = errStat2 )
+   allocate ( p%theta_st(2_IntKi*p%Nst), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%theta_st.', errStat, errMsg, RoutineName )
       return
@@ -108,18 +108,18 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
    p%chord = InitInp%chord
    p%radius = InitInp%radius
 
-      ! Compute the radius, total streamtube angle, and azimuthal position of streamtube midpoint
+      ! Compute the total streamtube angle and azimuthal position corresponding to each streamtube
+   p%dTheta = pi/p%Nst
    do i=1,p%numBladeNodes
-      p%dTheta(i) = pi/p%Nst
       do j=1,p%Nst
-         p%theta_st(j,i) = p%dTheta(i)/2.0_ReKi + p%dTheta(i)*(j-1)
+         p%theta_st(j) = p%dTheta(i)/2.0_ReKi + p%dTheta(i)*(j-1_IntKi)
       end do
       do j=p%Nst+1,p%Nst*2
-         p%theta_st(j,i) = p%theta_st(j-p%Nst,i) + pi
+         p%theta_st(j) = p%theta_st(j-p%Nst) + pi
       end do
-      do j = 1,lgth
-         p%indf(j) = p%DMSTRes + p%DMSTRes*(j-1)
-      end do
+   end do
+   do j = 1,lgth
+      p%indf(j) = p%DMSTRes + p%DMSTRes*(j-1)
    end do
 
 end subroutine DMST_SetParameters
@@ -147,7 +147,7 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
    end if 
    u%PitchAndTwist = 0.0_ReKi
 
-   allocate ( u%Vinf(3_IntKi, p%Nst, p%numBladeNodes), STAT = errStat2 )
+   allocate ( u%Vinf(3_IntKi,p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%Vinf.', errStat, errMsg, RoutineName )
       return
@@ -159,9 +159,9 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%blade_st.', errStat, errMsg, RoutineName )
       return
    end if 
-   u%blade_st = 0.0_ReKi
+   u%blade_st = 0_IntKi
 
-   allocate ( u%UserProp(p%numBladeNodes, p%numBlades), STAT = errStat2 )
+   allocate ( u%UserProp(p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%UserProp.', errStat, errMsg, RoutineName )
       return
@@ -285,147 +285,24 @@ END SUBROUTINE DMST_Init
 !       CALL BEMT_DestroyOutput( y, ErrStat, ErrMsg )
 
 ! END SUBROUTINE BEMT_End
-! !----------------------------------------------------------------------------------------------------------------------------------
-! subroutine BEMT_UpdateStates( t, n, u1, u2, p, x, xd, z, OtherState, AFInfo, m, errStat, errMsg )
-! ! Loose coupling routine for solving for constraint states, integrating continuous states, and updating discrete states
-! ! Continuous, constraint, discrete, and other states are updated for t + Interval
-! ! NOTE:  This is a non-standard framework interface!!!!!  GJH
-! !..................................................................................................................................
-!    real(DbKi),                          intent(in   ) :: t          ! Current simulation time in seconds
-!    integer(IntKi),                      intent(in   ) :: n          ! Current simulation time step n = 0,1,...
-!    type(BEMT_InputType),                intent(in   ) :: u1,u2      ! Input at t and t+ dt 
-!    type(BEMT_ParameterType),            intent(in   ) :: p          ! Parameters   
-!    type(BEMT_ContinuousStateType),      intent(inout) :: x          ! Input: Continuous states at t;
-!                                                                     !   Output: Continuous states at t + Interval
-!    type(BEMT_DiscreteStateType),        intent(inout) :: xd         ! Input: Discrete states at t;
-!                                                                     !   Output: Discrete states at t  + Interval
-!    type(BEMT_ConstraintStateType),      intent(inout) :: z          ! Input: Constraint states at t;
-!                                                                     !   Output: Constraint states at t + Interval
-!    type(BEMT_OtherStateType),           intent(inout) :: OtherState ! Input: Other states at t;
-!                                                                     !   Output: Other states at t + Interval
-!    type(BEMT_MiscVarType),              intent(inout) :: m          ! Misc/optimization variables
-!    type(AFI_ParameterType),             intent(in   ) :: AFInfo(:)  ! The airfoil parameter data
-!    integer(IntKi),                      intent(  out) :: errStat    ! Error status of the operation
-!    character(*),                        intent(  out) :: errMsg     ! Error message if ErrStat /= ErrID_None
+!----------------------------------------------------------------------------------------------------------------------------------
+subroutine DMST_UpdateStates(u, errStat, errMsg)
+!
+!..................................................................................................................................
+   type(DMST_InputType),                intent(inout) :: u(2)       ! Inputs at time t
+   integer(IntKi),                      intent(  out) :: errStat    ! Error status of the operation
+   character(*),                        intent(  out) :: errMsg     ! Error message if ErrStat /= ErrID_None
+
+   integer(IntKi)                                     :: i
       
-!    integer(IntKi)                                    :: i,j
-   
-!    character(ErrMsgLen)                              :: errMsg2     ! temporary Error message if ErrStat /= ErrID_None
-!    integer(IntKi)                                    :: errStat2    ! temporary Error status of the operation
-!    character(*), parameter                           :: RoutineName = 'BEMT_UpdateStates'
-!    real(DbKi)                                        :: uTimes(2)
-   
-!    ErrStat = ErrID_None
-!    ErrMsg = ""
-   
-!    uTimes(1) = t
-!    uTimes(2) = t+p%dt
-   
-!    !...............................................................................................................................
-!    ! if we haven't initialized z%phi, we want to get a better guess as to what the actual values of phi at t are:
-!    !...............................................................................................................................
-!    if (.not. OtherState%nodesInitialized) then
-!       call UpdatePhi( u1, p, z%phi, AFInfo, m, OtherState%ValidPhi, errStat2, errMsg2 )
-!       OtherState%nodesInitialized = .true.         ! otherState updated to t+dt (i.e., n+1)
-!    end if
-   
-!    !...............................................................................................................................
-!    !  compute inputs to DBEMT at step n (also setting inductions--including DBEMT and skewed wake corrections--at time n)
-!    !...............................................................................................................................
-!    call BEMT_CalcOutput_Inductions( 1, t, .true., .true., z%phi, u1, p, x, xd, z, OtherState, AFInfo, m%axInduction, m%tanInduction, m%chi, m, errStat2, errMsg2 )
-!       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-!       if (ErrStat >= AbortErrLev) return
+   ErrStat = ErrID_None
+   ErrMsg = ""
 
-! #ifdef DEBUG_BEMT_RESIDUAL
-!       if (p%useInduction) call WriteDEBUGValuesToFile(t, u1, p, x, xd, z, OtherState, m, AFInfo)
-! #endif   
+   !do i=1,size(u)
+   !   call DMST_DestroyInput( u(i), ErrStat, ErrMsg )
+   !enddo
 
-!    !...............................................................................................................................
-!    !  compute inputs to UA at time n (also setting inductions--including DBEMT and skewed wake corrections--at time n)
-!    !...............................................................................................................................
-!    if (p%UA_Flag) then
-!       m%phi = z%phi
-!       call SetInputs_for_UA_AllNodes(u1, p, m%phi, m%axInduction, m%tanInduction, m%u_UA(:,:,1))
-!    end if
-   
-!    !...............................................................................................................................
-!    !  update BEMT states to step n+1
-!    !...............................................................................................................................
-!    call UpdatePhi( u2, p, z%phi, AFInfo, m, OtherState%ValidPhi, errStat2, errMsg2 )
-!       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-!       if (errStat >= AbortErrLev) return
-  
-!    !...............................................................................................................................
-!    !  compute inputs to DBEMT at step n+1 (also setting inductions--WITHOUT DBEMT or skewed wake corrections--at step n+1)
-!    !...............................................................................................................................
-!    call BEMT_CalcOutput_Inductions( 2, t, .true., .false., z%phi, u2, p, x, xd, z, OtherState, AFInfo, m%axInduction, m%tanInduction, m%chi, m, errStat2, errMsg2 )
-!       call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-!       if (ErrStat >= AbortErrLev) return
-
-!    !...............................................................................................................................
-!    !  update DBEMT states to step n+1
-!    !...............................................................................................................................
-!    if (p%DBEMT_Mod /= DBEMT_none) then
-
-!       !............................................................................................................................
-!       ! update DBEMT states to t+dt
-!       !............................................................................................................................
-!       do j = 1,p%numBlades
-!          do i = 1,p%numBladeNodes
-!             call DBEMT_UpdateStates(i, j, t, n, m%u_DBEMT, p%DBEMT, x%DBEMT, OtherState%DBEMT, m%DBEMT, errStat2, errMsg2)
-!                if (ErrStat2 /= ErrID_None) then
-!                   call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//trim(NodeText(i,j)))
-!                   if (errStat >= AbortErrLev) return
-!                end if
-!          end do
-!       end do
-      
-!    end if
-   
-!    !...............................................................................................................................
-!    !  compute inputs to UA at time n+1 (also applying corrections to inductions--including DBEMT and skewed wake corrections)
-!    !...............................................................................................................................
-!    if (p%UA_Flag) then
-!          ! after updating DBEMT states, we can now apply the corrections we omitted on the last call to BEMT_CalcOutput_Inductions()
-!       if ( p%useInduction .and. .not. m%UseFrozenWake) then
-!             !......................................................................................................................
-!             ! apply DBEMT correction to axInduction and tanInduction:
-!             !......................................................................................................................
-!             if (p%DBEMT_Mod /= DBEMT_none) then
-!                call calculate_Inductions_from_DBEMT_AllNodes(2, uTimes(2), u2, p, x, OtherState, m, m%axInduction, m%tanInduction)
-!             end if
-         
-!             call ApplySkewedWakeCorrection_AllNodes(p, u2, m, m%axInduction, m%chi)
-
-!             !......................................................................................................................
-!             ! If TSR is too low, (start to) turn off induction
-!             !......................................................................................................................
-!             call check_turnOffBEMT(p, u2, m%BEM_weight, m%axInduction, m%tanInduction, m%FirstWarn_BEMoff)
-            
-!       end if
-   
-!       m%phi = z%phi
-!       call SetInputs_for_UA_AllNodes(u2, p, m%phi, m%axInduction, m%tanInduction, m%u_UA(:,:,2))
-   
-!       !............................................................................................................................
-!       !  compute UA states at t+dt
-!       !............................................................................................................................
-!       do j = 1,p%numBlades
-!          do i = 1,p%numBladeNodes
-
-!                ! COMPUTE: x%UA and/or xd%UA, OtherState%UA
-!             call UA_UpdateStates( i, j, t, n, m%u_UA(i,j,:), uTimes, p%UA, x%UA, xd%UA, OtherState%UA, AFInfo(p%AFIndx(i,j)), m%UA, errStat2, errMsg2 )
-!                if (ErrStat2 /= ErrID_None) then
-!                   call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName//trim(NodeText(i,j)))
-!                   if (errStat >= AbortErrLev) return
-!                end if
-
-!          end do
-!       end do
-
-!    end if ! is UA used?
-    
-! end subroutine BEMT_UpdateStates
+end subroutine DMST_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine calculate_CTmo( DMSTMod, indf, CTmo )
 ! This routine is called from DMST_CalcOutput and calculates the thrust coefficient from linear momentum theory.
@@ -457,53 +334,62 @@ subroutine calculate_CTmo( DMSTMod, indf, CTmo )
    
 end subroutine calculate_CTmo
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_CTbe( m, Vinf, indf, p, u, AFinfo, CTbe )
+subroutine calculate_CTbe( Vinf, indf, blade_theta, p, u, AFinfo, CTbe )
    ! This routine is called from DMST_CalcOutput and calculates the thrust coefficient from blade element theory.
    !..................................................................................................................................
-   integer(IntKi),                 intent(in   )                   :: m           ! Loops through sweeps
-   real(ReKi),                     intent(in   )                   :: Vinf(:,:,:) ! Free-stream velocity
-   real(ReKi),                     intent(in   )                   :: indf(:)     ! Array of induction factors
-   type(DMST_ParameterType),       intent(in   )                   :: p           ! Parameters
-   type(DMST_InputType),           intent(in   )                   :: u           ! Inputs at time t
-   type(AFI_ParameterType),        intent(in   )                   :: AFInfo(:)   ! The airfoil parameter data
-   real(ReKi),                     intent(inout)                   :: CTbe(:,:,:) ! Thrust coefficient from blade element theory
+   real(ReKi),                     intent(in   )                   :: Vinf(:,:,:)      ! Free-stream velocity
+   real(ReKi),                     intent(in   )                   :: indf(:)          ! Array of induction factors
+   real(ReKi),                     intent(in   )                   :: blade_theta(:,:) ! Array of induction factors
+   type(DMST_ParameterType),       intent(in   )                   :: p                ! Parameters
+   type(DMST_InputType),           intent(in   )                   :: u                ! Inputs at time t
+   type(AFI_ParameterType),        intent(in   )                   :: AFInfo(:)        ! The airfoil parameter data
+   real(ReKi),                     intent(inout)                   :: CTbe(:,:,:)      ! Thrust coefficient from blade element theory
       
       ! Local variables
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: V           ! Free-stream minus induced velocity
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: lambda      ! Local tip-speed ratio
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Vrel        ! Relative velocity
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Reb         ! Blade Reynolds number
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: alpha       ! Angle of attack
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Cn          ! Normal force coefficient on the blade
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)   :: Ct          ! Tangential force coefficient on the blade
-   integer(IntKi)                                                  :: i           ! Loops through induction factors
-   integer(IntKi)                                                  :: j           ! Loops through streamtubes
-   integer(IntKi)                                                  :: k           ! Loops through nodes
-   integer(IntKi)                                                  :: n           ! Index for theta_st
-   character(ErrMsgLen)                                            :: errMsg2     ! Temporary error message if ErrStat /= ErrID_None
-   integer(IntKi)                                                  :: errStat2    ! Temporary error status of the operation
-   type(AFI_OutputType)                                            :: AFI_interp  ! Interpolated airfoil coefficients
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: V           ! Free-stream minus induced velocity
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: lambda      ! Local tip-speed ratio
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: Vrel        ! Relative velocity
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: Reb         ! Blade Reynolds number
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: alpha       ! Angle of attack
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: Cn          ! Normal force coefficient on the blade
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)   :: Ct          ! Tangential force coefficient on the blade
+   integer(IntKi)                                                        :: i           ! Loops through induction factors
+   integer(IntKi)                                                        :: j           ! Loops through streamtubes
+   integer(IntKi)                                                        :: k           ! Loops through nodes
+   character(ErrMsgLen)                                                  :: errMsg2     ! Temporary error message if ErrStat /= ErrID_None
+   integer(IntKi)                                                        :: errStat2    ! Temporary error status of the operation
+   type(AFI_OutputType)                                                  :: AFI_interp  ! Interpolated airfoil coefficients
 
-   do k = 1,p%numBladeNodes
-      do j = 1,p%Nst
-         n = j + (m-1)*(p%Nst)
-         do i = 1,size(p%indf)
-            V(i,j,k) = p%indf(i)*Vinf(1,j,k) ! free-stream minus induced velocity
-            lambda(i,j,k) = u%omega*p%radius(k)/V(i,j,k) ! local tip-speed ratio
-            Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0_ReKi*lambda(i,j,k)*cos(p%theta_st(n,k)) + lambda(i,j,k)**2) ! relative velocity
-            Reb(i,j,k) = Vrel(i,j,k)*p%chord(k,1)/p%kinVisc ! blade Reynolds number
-            alpha(i,j,k) = -atan2(sin(p%theta_st(n,k)),lambda(i,j,k) + cos(p%theta_st(n,k))) - u%PitchAndTwist(k,1) ! angle of attack
-            call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(k,1), AFInfo(p%AFindx(k,1)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
-            Cn(i,j,k) = AFI_interp%Cd*sin(alpha(i,j,k)) + AFI_interp%Cl*cos(alpha(i,j,k)) ! normal to chord force coefficient on the blade, positive inwards towards rotation axis
-            Ct(i,j,k) = AFI_interp%Cd*cos(alpha(i,j,k)) - AFI_interp%Cl*sin(alpha(i,j,k)) ! tangential to chord force coefficient on the blade, positive towards trailing edge
-            CTbe(i,j,k) = Ct(i,j,k)*cos(p%theta_st(n,k)) - Cn(i,j,k)*sin(p%theta_st(n,k)) ! thrust coefficient from blade element theory
-         end do
+      ! Initialize some local values
+   V = 0.0
+   lambda = 0.0
+   Vrel = 0
+   Reb = 0
+   alpha = 0
+   Cn = 0.0
+   Ct = 0.0
+
+   do k = 1,p%numBlades
+      do j = 1,p%numBladeNodes
+         if ( blade_theta(j,k) < 9999.0 ) then
+            do i = 1,size(p%indf)
+               V(i,j,k) = p%indf(i)*Vinf(1,j,k) ! free-stream minus induced velocity
+               lambda(i,j,k) = u%omega*p%radius(j,k)/V(i,j,k) ! local tip-speed ratio
+               Vrel(i,j,k) = V(i,j,k)*sqrt(1 + 2.0_ReKi*lambda(i,j,k)*cos(blade_theta(j,k)) + lambda(i,j,k)**2) ! relative velocity
+               Reb(i,j,k) = Vrel(i,j,k)*p%chord(j,k)/p%kinVisc ! blade Reynolds number
+               alpha(i,j,k) = -atan2(sin(blade_theta(j,k)),lambda(i,j,k) + cos(blade_theta(j,k))) - u%PitchAndTwist(j,k) ! angle of attack
+               call AFI_ComputeAirfoilCoefs( alpha(i,j,k), Reb(i,j,k), u%UserProp(j,k), AFInfo(p%AFindx(j,k)), AFI_interp, errStat2, errMsg2 ) ! outputs airfoil coefficients interpolated at given Reb and alpha 
+               Cn(i,j,k) = AFI_interp%Cd*sin(alpha(i,j,k)) + AFI_interp%Cl*cos(alpha(i,j,k)) ! normal to chord force coefficient on the blade, positive inwards towards rotation axis
+               Ct(i,j,k) = AFI_interp%Cd*cos(alpha(i,j,k)) - AFI_interp%Cl*sin(alpha(i,j,k)) ! tangential to chord force coefficient on the blade, positive towards trailing edge
+               CTbe(i,j,k) = Ct(i,j,k)*cos(blade_theta(j,k)) - Cn(i,j,k)*sin(blade_theta(j,k)) ! thrust coefficient from blade element theory
+            end do
+         end if
       end do
    end do
       
 end subroutine calculate_CTbe
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPtsSum, CTmo, CTbe, indf_final, indf_prev )
+subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPtsSum, CTmo, CTbe, indf_final, indf_prev ) !TO DO
    ! This routine is called from DMST_CalcOutput and calculates the final induction factor in a streamtube.
    !..................................................................................................................................
    integer(IntKi),                 intent(in   )                   :: DMSTMod         ! Type of momentum theory model
@@ -566,14 +452,14 @@ subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPt
       end if
    end do
 
-   if ( crossPtsSum > 1_IntKi ) then
-      do i = 1,size(indf_tmp)
-         indf_diff(i) = abs(indf_tmp(i) - indf_prev)
-      end do
-      indf_final = indf_tmp(minloc(indf_diff,1_IntKi))
-   else if ( crossPtsSum == 1_IntKi ) then
+   !if ( crossPtsSum > 1_IntKi ) then
+   !   do i = 1,size(indf_tmp)
+   !      indf_diff(i) = abs(indf_tmp(i) - indf_prev)
+   !   end do
+   !   indf_final = indf_tmp(minloc(indf_diff,1_IntKi))
+   !else if ( crossPtsSum == 1_IntKi ) then
       indf_final = indf_tmp(1)
-   end if
+   !end if
 
    indf_prev = indf_final
 
@@ -671,30 +557,31 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
    character(*),                   intent(  out)                           :: errMsg         ! Error message if ErrStat /= ErrID_None
 
       ! Local variables
-   real(ReKi),     dimension(3_IntKi,p%Nst,p%numBladeNodes)                :: Vinf           ! Free-stream velocity
-   real(ReKi),     dimension(size(p%indf))                                 :: CTmo           ! Thrust coefficient from linear momentum theory
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)           :: CTbe           ! Thrust coefficient from blade element theory
-   real(ReKi),     dimension(size(p%indf),p%Nst,p%numBladeNodes)           :: CTdiff         ! Difference between CTbe and CTmo
-   integer(IntKi), dimension(size(p%indf)-1_IntKi,p%Nst,p%numBladeNodes)   :: crossPts       ! Crossing points between CTmo and CTbe
-   integer(IntKi), dimension(p%Nst,p%numBladeNodes)                        :: crossPtsSum    ! Number of crossing points in a streamtube
-   integer(IntKi), dimension(p%numBladeNodes)                              :: crossPtsInd    ! Index of the first streamtube with a single crossing point
-   real(ReKi),     dimension(p%Nst,p%numBladeNodes)                        :: indf_final     ! Final induction factors
-   real(ReKi),     dimension(p%Nst,p%numBladeNodes)                        :: indf_final_u   ! Final induction factors for the upstream sweep
-   real(ReKi),     dimension(p%Nst,p%numBladeNodes)                        :: indf_final_d   ! Final induction factors for the downstream sweep
-   real(ReKi)                                                              :: indf_prev      ! Final induction factor of the current/previous streamtube
-   real(ReKi),     dimension(3_IntKi,p%Nst*2_IntKi,p%numBladeNodes)        :: Vind_st        ! Induced velocity in global coordinates
-   integer(IntKi)                                                          :: i              ! Loops through induction factors
-   integer(IntKi)                                                          :: j              ! Loops through streamtubes
-   integer(IntKi)                                                          :: k              ! Loops through nodes
-   integer(IntKi)                                                          :: m              ! Loops through sweeps
-   integer(IntKi)                                                          :: n              ! Loops through blades   
-   character(*), parameter                                                 :: RoutineName = 'DMST_CalcOutput'
+   real(ReKi),     dimension(3_IntKi,p%numBladeNodes,p%numBlades)               :: Vinf           ! Free-stream velocity
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: blade_theta    ! Thrust coefficient from blade element theory
+   real(ReKi),     dimension(size(p%indf))                                      :: CTmo           ! Thrust coefficient from linear momentum theory
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)          :: CTbe           ! Thrust coefficient from blade element theory
+   real(ReKi),     dimension(size(p%indf),p%numBladeNodes,p%numBlades)          :: CTdiff         ! Difference between CTbe and CTmo
+   integer(IntKi), dimension(size(p%indf)-1_IntKi,p%numBladeNodes,p%numBlades)  :: crossPts       ! Crossing points between CTmo and CTbe
+   integer(IntKi), dimension(p%numBladeNodes,p%numBlades)                       :: crossPtsSum    ! Number of crossing points in a streamtube
+   integer(IntKi), dimension(p%numBladeNodes)                                   :: crossPtsInd    ! Index of the first streamtube with a single crossing point
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final     ! Final induction factors
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final_u   ! Final induction factors for the upstream sweep
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final_d   ! Final induction factors for the downstream sweep
+   real(ReKi)                                                                   :: indf_prev      ! Final induction factor of the current/previous streamtube
+   real(ReKi),     dimension(3_IntKi,p%numBladeNodes,p%numBlades)               :: Vind_st        ! Induced velocity in global coordinates
+   integer(IntKi)                                                               :: i              ! Loops through induction factors
+   integer(IntKi)                                                               :: j              ! Loops through streamtubes
+   integer(IntKi)                                                               :: k              ! Loops through nodes
+   integer(IntKi)                                                               :: m              ! Loops through sweeps
+   integer(IntKi)                                                               :: n              ! Loops through blades   
+   character(*), parameter                                                      :: RoutineName = 'DMST_CalcOutput'
 
       ! Initialize some output values
    errStat = ErrID_None
    errMsg  = ""
 
-         ! Initialize some local values
+      ! Initialize some local values
    indf_final_u = 0.0
    indf_final_d = 0.0
    Vind_st = 0.0
@@ -715,66 +602,87 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
       indf_final = 0.0
       indf_prev = 0.0
       Vinf = 0.0
+      blade_theta = 9999.0
+
+         ! Determine streamtube angle of each blade node
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes
+            if ( m==1 .and. u%blade_st(j,k) <= p%Nst ) then
+               blade_theta(j,k) = p%theta_st(u%blade_st(j,k))
+            elseif ( m==1 .and. u%blade_st(j,k) > p%Nst ) then
+               blade_theta(j,k) = p%theta_st(u%blade_st(j,k)) - p%dTheta(j)*(u%blade_st(j,k) + u%blade_st(j,k) - p%Nst*2_IntKi - 1_IntKi)
+            elseif ( m==2 .and. u%blade_st(j,k) > p%Nst ) then
+               blade_theta(j,k) = p%theta_st(u%blade_st(j,k))
+            end if
+         end do
+      end do
 
       if ( m == 1_IntKi ) then
          Vinf = u%Vinf
-      else if ( m == 2_IntKi ) then
-         do k = 1,p%numBladeNodes
-            do j = 1,p%Nst
+      end if
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes
+            if ( m == 2_IntKi .and. blade_theta(j,k) < 9999.0 ) then
                if ( p%DMSTMod == 1 ) then
-                  Vinf(1,j,k) = (2.0_ReKi*indf_final_u(p%Nst-j+1,k) - 1.0_ReKi)*u%Vinf(1,p%Nst-j+1,k)
+                  Vinf(1,j,k) = (2.0_ReKi*indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
                else if ( p%DMSTMod == 2 ) then
-                  Vinf(1,j,k) = indf_final_u(p%Nst-j+1,k)/(2.0_ReKi - indf_final_u(p%Nst-j+1,k))*u%Vinf(1,p%Nst-j+1,k)
+                  Vinf(1,j,k) = indf_final_u(j,k)/(2.0_ReKi - indf_final_u(j,k))*u%Vinf(1,j,k)
                end if
-            end do 
-         end do
-      end if 
-
-         ! Calculate the thrust coefficient from blade element theory
-      call calculate_CTbe( m, Vinf, p%indf, p, u, AFInfo, CTbe )
-
-         ! Calculate the difference between CTbe and CTmo
-      do k = 1,p%numBladeNodes
-         do j = 1,p%Nst
-            CTdiff(:,j,k) = CTbe(:,j,k) - CTmo
-         end do
-      end do
-
-         ! Locate crossing points between CTmo and CTbe
-      do k = 1,p%numBladeNodes
-         do j = 1,p%Nst
-            do i = 1,size(p%indf)-1
-               if ( CTdiff(i,j,k) < 0.0_ReKi .and. CTdiff(i+1,j,k) >= 0.0_ReKi ) then
-                  crossPts(i,j,k) = 1_IntKi
-               else if ( CTdiff(i,j,k) >= 0.0_ReKi .and. CTdiff(i+1,j,k) < 0.0_ReKi ) then
-                  crossPts(i,j,k) = 1_IntKi
-               end if
-            end do
-            ! Calculate the number of crossing points in a streamtube
-            do i = 1,size(p%indf)-1
-               crossPtsSum(j,k) = crossPtsSum(j,k) + crossPts(i,j,k)
-            end do
-         end do
-      end do
-
-         ! Identify first streamtube with a single crossing point
-      do k = 1,p%numBladeNodes
-         do j = 1,p%Nst
-            if ( crossPtsSum(j,k) == 1_IntKi ) then
-               crossPtsInd(k) = j
-               exit
             end if
          end do 
       end do
 
+         ! Calculate the thrust coefficient from blade element theory
+      call calculate_CTbe( Vinf, p%indf, blade_theta, p, u, AFInfo, CTbe )
+
+         ! Calculate the difference between CTbe and CTmo
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes
+            if ( blade_theta(j,k) < 9999.0 ) then
+               CTdiff(:,j,k) = CTbe(:,j,k) - CTmo
+            end if
+         end do
+      end do
+
+         ! Locate crossing points between CTmo and CTbe
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes
+            if ( blade_theta(j,k) < 9999.0 ) then
+               do i = 1,size(p%indf)-1
+                  if ( CTdiff(i,j,k) < 0.0_ReKi .and. CTdiff(i+1,j,k) >= 0.0_ReKi ) then
+                     crossPts(i,j,k) = 1_IntKi
+                  else if ( CTdiff(i,j,k) >= 0.0_ReKi .and. CTdiff(i+1,j,k) < 0.0_ReKi ) then
+                     crossPts(i,j,k) = 1_IntKi
+                  end if
+               end do
+               ! Calculate the number of crossing points for a blade node
+               do i = 1,size(p%indf)-1
+                  crossPtsSum(j,k) = crossPtsSum(j,k) + crossPts(i,j,k)
+               end do
+            end if
+         end do
+      end do
+
+         ! Identify first streamtube with a single crossing point **
+      !do k = 1,p%numBladeNodes
+      !   do j = 1,p%Nst
+      !      if ( crossPtsSum(j,k) == 1_IntKi ) then
+      !        crossPtsInd(k) = j
+      !        exit
+      !     end if
+      !  end do 
+      !end do
+
          ! Calculate final thrust coefficients and induction factors
-      do k = 1,p%numBladeNodes
-         do j = crossPtsInd(k),p%Nst
-            call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes !j = crossPtsInd(k),p%Nst
+            if ( blade_theta(j,k) < 9999.0 ) then
+               call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
+            end if
          end do
-         do j = 1,crossPtsInd(k)-1
-            call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
-         end do
+         !do j = 1,crossPtsInd(k)-1
+         !   call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts(:,j,k), crossPtsSum(j,k), CTmo, CTbe(:,j,k), indf_final(j,k), indf_prev )
+         !end do
       end do
       if ( m == 1_IntKi ) then
          indf_final_u = indf_final
@@ -784,31 +692,23 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
 
    end do
 
-   ! Calculate final induced velocities in global coordinates
-   do k = 1,p%numBladeNodes
-      if ( p%DMSTMod == 1 ) then   
-         do j = 1,p%Nst
+      ! Calculate final induced velocities in global coordinates
+   do k = 1,p%numBlades
+      do j = 1,p%numBladeNodes
+         if ( p%DMSTMod == 1 .and. u%blade_st(j,k) <= p%Nst ) then   
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
-         end do
-         do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(2*p%Nst-j+1,k)*indf_final_d(j-p%Nst,k) - indf_final_d(j-p%Nst,k) - indf_final_u(2*p%Nst-j+1,k))*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
-         end do
-      else if ( p%DMSTMod == 2 ) then
-         do j = 1,p%Nst
+         elseif ( p%DMSTMod == 1 .and. u%blade_st(j,k) > p%Nst ) then
+            Vind_st(1,j,k) = (2.0_ReKi*indf_final_u(j,k)*indf_final_d(j,k) - indf_final_d(j,k) - 1)*u%Vinf(1,j,k)
+         elseif ( p%DMSTMod == 2 .and. u%blade_st(j,k) <= p%Nst ) then
             Vind_st(1,j,k) = (indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
-         end do
-         do j = p%Nst+1,p%Nst*2
-            Vind_st(1,j,k) = (indf_final_d(j-p%Nst,k)/(2.0_ReKi - indf_final_u(2*p%Nst-j+1,k)) - 1.0_ReKi)*indf_final_u(2*p%Nst-j+1,k)*u%Vinf(1,2*p%Nst-j+1,k) + Vind_st(1,2*p%Nst-j+1,k)
-         end do
-      end if
-   end do
-
-   ! Output induced velocity values at blade nodes
-   do n = 1,p%numBlades
-      do k = 1,p%numBladeNodes
-         y%Vind(:,k,n) = Vind_st(:,u%blade_st(k,n),k)
+         elseif ( p%DMSTMod == 2 .and. u%blade_st(j,k) > p%Nst ) then
+            Vind_st(1,j,k) = (indf_final_u(j,k)*indf_final_d(j,k)/(2.0_ReKi - indf_final_u(j,k)) - 1.0_ReKi)*u%Vinf(1,j,k)
+         end if
       end do
    end do
+
+      ! Output induced velocity values at blade nodes
+   y%Vind = Vind_st
 
 end subroutine DMST_CalcOutput
 !----------------------------------------------------------------------------------------------------------------------------------
