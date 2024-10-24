@@ -571,10 +571,9 @@ subroutine DMST_CalcOutput( u, p, AFInfo, y, errStat, errMsg )
    real(ReKi)                                                                   :: indf_prev      ! Final induction factor of the current/previous streamtube
    real(ReKi),     dimension(3_IntKi,p%numBladeNodes,p%numBlades)               :: Vind_st        ! Induced velocity in global coordinates
    integer(IntKi)                                                               :: i              ! Loops through induction factors
-   integer(IntKi)                                                               :: j              ! Loops through streamtubes
-   integer(IntKi)                                                               :: k              ! Loops through nodes
+   integer(IntKi)                                                               :: j              ! Loops through blade nodes
+   integer(IntKi)                                                               :: k              ! Loops through blades
    integer(IntKi)                                                               :: m              ! Loops through sweeps
-   integer(IntKi)                                                               :: n              ! Loops through blades   
    character(*), parameter                                                      :: RoutineName = 'DMST_CalcOutput'
 
       ! Initialize some output values
