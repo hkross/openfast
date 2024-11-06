@@ -98,7 +98,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   lgth = floor(1.0_ReKi/p%DMSTRes)
+   lgth = floor(2.0_ReKi/p%DMSTRes) - 1_IntKi
    allocate ( p%indf(lgth), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%indf.', errStat, errMsg, RoutineName )
@@ -593,6 +593,8 @@ subroutine DMST_QuadSolve_Glauert( tol, CTfinal, indf, indf_plus, indf_tmp )
          indf_tmp = indf_tmp1
       else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
          indf_tmp = indf_tmp2
+      else
+         indf_tmp = (indf+indf_plus)/2
       end if
    end if
       
@@ -620,37 +622,41 @@ subroutine DMST_QuadSolve_Theoretical( tol, CTfinal, indf, indf_plus, indf_tmp )
          indf_tmp = indf_tmp1
       else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
          indf_tmp = indf_tmp2
+      else
+         indf_tmp = (indf+indf_plus)/2
       end if
    end if
          
 end subroutine DMST_QuadSolve_Theoretical
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_QuadSolve_HighLoad( tol, CTfinal, indf, indf_plus, indf_tmp )
-   ! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
-   !..................................................................................................................................
-      real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
-      real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
-      real(ReKi),                     intent(in   )  :: indf         ! An induction factor
-      real(ReKi),                     intent(in   )  :: indf_plus    ! An induction factor
-      real(ReKi),                     intent(inout)  :: indf_tmp     ! A possible final induction factor
-      
-         ! Local variables
-      real(ReKi)                                     :: discriminant ! Discriminant of quadratic solution
-      real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
-      real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
+! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
+!..................................................................................................................................
+   real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
+   real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
+   real(ReKi),                     intent(in   )  :: indf         ! An induction factor
+   real(ReKi),                     intent(in   )  :: indf_plus    ! An induction factor
+   real(ReKi),                     intent(inout)  :: indf_tmp     ! A possible final induction factor
    
-      discriminant = (1.0_ReKi - 3.0_ReKi/4.0_ReKi*CTfinal)**2 - 4.0_ReKi*1.0_ReKi*(3.0_ReKi/2.0_ReKi*CTfinal - 2.0_ReKi)
-      if ( discriminant >= 0.0_ReKi ) then
-         indf_tmp1 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi + sqrt(discriminant))/(2.0_ReKi)
-         indf_tmp2 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi - sqrt(discriminant))/(2.0_ReKi)
-         if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
-            indf_tmp = indf_tmp1
-         else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
-            indf_tmp = indf_tmp2
-         end if
+      ! Local variables
+   real(ReKi)                                     :: discriminant ! Discriminant of quadratic solution
+   real(ReKi)                                     :: indf_tmp1    ! Temporary induction factor value
+   real(ReKi)                                     :: indf_tmp2    ! Temporary induction factor value
+
+   discriminant = (1.0_ReKi - 3.0_ReKi/4.0_ReKi*CTfinal)**2 - 4.0_ReKi*1.0_ReKi*(3.0_ReKi/2.0_ReKi*CTfinal - 2.0_ReKi)
+   if ( discriminant >= 0.0_ReKi ) then
+      indf_tmp1 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi + sqrt(discriminant))/(2.0_ReKi)
+      indf_tmp2 = (3.0_ReKi/4.0_ReKi*CTfinal - 1.0_ReKi - sqrt(discriminant))/(2.0_ReKi)
+      if ( indf_tmp1 >= indf-tol .and. indf_tmp1 <= indf_plus+tol ) then
+         indf_tmp = indf_tmp1
+      else if ( indf_tmp2 >= indf-tol .and. indf_tmp2 <= indf_plus+tol ) then
+         indf_tmp = indf_tmp2
+      else
+         indf_tmp = (indf+indf_plus)/2
       end if
-            
-   end subroutine DMST_QuadSolve_HighLoad
+   end if
+         
+end subroutine DMST_QuadSolve_HighLoad
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
 ! Routine for computing outputs.
