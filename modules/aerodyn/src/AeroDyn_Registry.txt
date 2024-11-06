@@ -280,6 +280,7 @@ typedef	^	ConstraintStateType	FVW_ConstraintStateType	FVW	-	-	-	"Constraint stat
 
 # Define "other" states here:
 typedef	^	RotOtherStateType	BEMT_OtherStateType	BEMT	-	-	-	"OtherStates from the BEMT module"	-
+typedef	^	RotOtherStateType	DMST_OtherStateType	DMST	-	-	-	"OtherStates from the DMST module"	-
 typedef	^	RotOtherStateType	AA_OtherStateType	AA	-	-	-	"OtherStates from the AA module"	-
 
 typedef	^	OtherStateType	RotOtherStateType	rotors	{:}	-	-	"OtherStates from the BEMT module"	-

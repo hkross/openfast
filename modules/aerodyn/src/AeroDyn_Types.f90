@@ -314,6 +314,7 @@ IMPLICIT NONE
 ! =========  RotOtherStateType  =======
   TYPE, PUBLIC :: RotOtherStateType
     TYPE(BEMT_OtherStateType)  :: BEMT      !< OtherStates from the BEMT module [-]
+    TYPE(DMST_OtherStateType)  :: DMST      !< OtherStates from the DMST module [-]
     TYPE(AA_OtherStateType)  :: AA      !< OtherStates from the AA module [-]
   END TYPE RotOtherStateType
 ! =======================
@@ -2952,6 +2953,9 @@ subroutine AD_CopyRotOtherStateType(SrcRotOtherStateTypeData, DstRotOtherStateTy
    call BEMT_CopyOtherState(SrcRotOtherStateTypeData%BEMT, DstRotOtherStateTypeData%BEMT, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call DMST_CopyOtherState(SrcRotOtherStateTypeData%DMST, DstRotOtherStateTypeData%DMST, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    call AA_CopyOtherState(SrcRotOtherStateTypeData%AA, DstRotOtherStateTypeData%AA, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -2968,6 +2972,8 @@ subroutine AD_DestroyRotOtherStateType(RotOtherStateTypeData, ErrStat, ErrMsg)
    ErrMsg  = ''
    call BEMT_DestroyOtherState(RotOtherStateTypeData%BEMT, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call DMST_DestroyOtherState(RotOtherStateTypeData%DMST, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call AA_DestroyOtherState(RotOtherStateTypeData%AA, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
@@ -2978,6 +2984,7 @@ subroutine AD_PackRotOtherStateType(RF, Indata)
    character(*), parameter         :: RoutineName = 'AD_PackRotOtherStateType'
    if (RF%ErrStat >= AbortErrLev) return
    call BEMT_PackOtherState(RF, InData%BEMT) 
+   call DMST_PackOtherState(RF, InData%DMST) 
    call AA_PackOtherState(RF, InData%AA) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -2988,6 +2995,7 @@ subroutine AD_UnPackRotOtherStateType(RF, OutData)
    character(*), parameter            :: RoutineName = 'AD_UnPackRotOtherStateType'
    if (RF%ErrStat /= ErrID_None) return
    call BEMT_UnpackOtherState(RF, OutData%BEMT) ! BEMT 
+   call DMST_UnpackOtherState(RF, OutData%DMST) ! DMST 
    call AA_UnpackOtherState(RF, OutData%AA) ! AA 
 end subroutine
 

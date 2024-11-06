@@ -459,7 +459,7 @@ subroutine AD_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, InitOut
 
    elseif (p%Wake_Mod == WakeMod_DMST) then
       do iR = 1, nRotors
-         call Init_DMSTmodule( InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%DMST_u(1), p%rotors(iR), p, m%rotors(iR)%DMST_y, ErrStat2, ErrMsg2 )
+         call Init_DMSTmodule( InputFileData, InputFileData%rotors(iR), u%rotors(iR), m%rotors(iR)%DMST_u(1), p%rotors(iR), p, OtherState%rotors(iR)%DMST, m%rotors(iR)%DMST_y, ErrStat2, ErrMsg2 )
          if (Failed()) return;
 
          call DMST_CopyInput( m%rotors(iR)%DMST_u(1), m%rotors(iR)%DMST_u(2), MESH_NEWCOPY, ErrStat2, ErrMsg2 )
@@ -656,10 +656,14 @@ subroutine AD_ReInit(p, x, xd, z, OtherState, m, Interval, ErrStat, ErrMsg )
             call UA_ReInit( p%rotors(iR)%BEMT%UA, x%rotors(iR)%BEMT%UA, xd%rotors(iR)%BEMT%UA, OtherState%rotors(iR)%BEMT%UA, m%rotors(iR)%BEMT%UA, ErrStat2, ErrMsg2 )
                call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
          end if
-      enddo
+      end do
+   elseif (p%Wake_Mod == WakeMod_DMST) then
+      do IR=1, size(p%rotors)
+         call DMST_ReInit(p%rotors(iR)%DMST,OtherState%rotors(iR)%DMST,ErrStat,ErrMsg)
+      end do
    else
       ErrStat = ErrID_Fatal
-      ErrMsg = 'AD_ReInit: Cannot reinitialize AeroDyn with OLAF or DMST'
+      ErrMsg = 'AD_ReInit: Cannot reinitialize AeroDyn with OLAF'
    end if
 
       
@@ -1848,7 +1852,7 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
 
    elseif (p%Wake_Mod == WakeMod_DMST) then
       do iR = 1,size(p%rotors)
-         call DMST_UpdateStates(m%rotors(iR)%DMST_u(:), errStat2, errMsg2)
+         call DMST_UpdateStates(p%rotors(iR)%DMST, m%rotors(iR)%DMST_u(:), OtherState%rotors(iR)%DMST, errStat2, errMsg2)
          if (Failed()) return
       end do
 
@@ -2189,7 +2193,7 @@ subroutine RotCalcOutput( t, u, RotInflow, p, p_AD, x, xd, z, OtherState, y, m, 
    elseif (p_AD%Wake_Mod == WakeMod_DMST) then
       ! Call the DMST module CalcOutput.  Notice that the DMST outputs are purposely attached to AeroDyn's MiscVar structure to
       ! avoid issues with the coupling code
-      call DMST_CalcOutput( m%DMST_u(indx), p%DMST, p_AD%AFI, m%DMST_y, ErrStat2, ErrMsg2 )
+      call DMST_CalcOutput( m%DMST_u(indx), p%DMST, OtherState%DMST, p_AD%AFI, m%DMST_y, ErrStat2, ErrMsg2 )
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
       call SetOutputsFromDMST( u, p, p_AD, m, y, ErrStat2, ErrMsg2 )
          call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
@@ -3666,21 +3670,22 @@ end subroutine Calculate_MeshOrientation_LiftingLine
 !> This subroutine sets m%DMST_u.
 subroutine SetInputsForDMST(p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
 
-   type(RotParameterType),  intent(in   )  :: p                               !< AD parameters
+   type(RotParameterType),  intent(in   )  :: p                               !< Rotor parameters
    type(AD_ParameterType),  intent(in   )  :: p_AD                            !< AD parameters
    type(RotInputType),      intent(in   )  :: u                               !< AD inputs at time
    type(RotInflowType),     intent(in   )  :: RotInflow                       !< Rotor inflow at time
    type(RotMiscVarType),    intent(inout)  :: m                               !< Misc/optimization variables
-   integer,                 intent(in   )  :: indx                            !< index into m%DMST_u array; must be 1 or 2 (but not checked here)
+   integer,                 intent(in   )  :: indx                            !< Index into m%DMST_u array; must be 1 or 2 (but not checked here)
    integer(IntKi),          intent(  out)  :: ErrStat                         !< Error status of the operation
    character(*),            intent(  out)  :: ErrMsg                          !< Error message if ErrStat /= ErrID_None
       
    ! local variables
    real(R8Ki)                              :: x_hat_disk(3)
-   real(R8Ki)                              :: theta_b_tmp(3)                               ! Orientation of blade 1 relative to hub
-   real(R8Ki)                              :: theta_b(p%NumBlades)                         ! Azimuthal location of each blade
-   real(ReKi)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)  ! Range of azimuth angles within each streamtube 
+   real(R8Ki)                              :: theta_b_tmp                               
+   real(R8Ki)                              :: theta_b(3)
+   real(R8Ki)                              :: theta_st_r(2,2_IntKi*p%DMST%Nst,p%NumBlNds)
    real(R8Ki), allocatable                 :: thetaBladeNds(:,:)
+   real(R8Ki)                              :: bl_hub(3,3,p%NumBlNds)
    integer(intKi)                          :: i                                            ! Loop counter for streamtubes
    integer(intKi)                          :: j                                            ! Loop counter for nodes
    integer(intKi)                          :: k                                            ! Loop counter for blades
@@ -3688,42 +3693,48 @@ subroutine SetInputsForDMST(p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
 
    allocate(thetaBladeNds(p%NumBlNds, p%NumBlades))
 
-      ! Get disk average values and orientations
+      ! Disk average values and orientations
    call DiskAvgValues(p, u, RotInflow, m, x_hat_disk)
 
+      ! Pitch and twist
    call Calculate_MeshOrientation_LiftingLine( p, u, m, thetaBladeNds, m%Toe, m%Cant, ErrStat=ErrStat, ErrMsg=ErrMsg )
    if (ErrStat >= AbortErrLev) return
    m%DMST_u(indx)%PitchAndTwist = thetaBladeNds
    if (allocated(thetaBladeNds)) deallocate(thetaBladeNds)
 
       ! Free-stream velocity, m/s
-   m%DMST_u(indx)%Vinf = m%DisturbedInflow
+   m%DMST_u(indx)%Vinf = m%DisturbedInflow ! global coordinates
 
       ! Rotor angular velocity, rad/s
    m%DMST_u(indx)%omega = dot_product( u%HubMotion%Orientation(1,1:3,1), u%HubMotion%RotationVel(:,1) )
    
-   ! Azimuthal location of each blade, rad
-   theta_b_tmp = EulerExtract( matmul(u%HubMotion%Orientation(:,:,1), transpose(u%HubMotion%RefOrientation(:,:,1))) )
-   theta_b(1) = theta_b_tmp(1)
-   call Zero2TwoPi(theta_b(1))
-   do k = 2,p%NumBlades
-      theta_b(k) = theta_b(1) + 2.0_ReKi*pi/p%NumBlades*(k-1)
-      call Zero2TwoPi(theta_b(k))
-   end do
-
-   ! Range of azimuth angles within each streamtube
-   do j = 1,p%NumBlNds
-      do i = 1,2*p%DMST%Nst
-         theta_st_r(1,i,j) = p%DMST%theta_st(i) - p%DMST%dTheta(j)/2.0_ReKi
-         theta_st_r(2,i,j) = p%DMST%theta_st(i) + p%DMST%dTheta(j)/2.0_ReKi
+      ! Azimuthal location of each blade node, rad
+   do k = 1,p%NumBlades
+      call Calculate_MeshOrientation_Rel2Hub(u%BladeMotion(k), u%HubMotion, x_hat_disk, bl_hub)
+      do j = 1,p%NumBlNds
+         theta_b = -EulerExtract(transpose(bl_hub(:,:,j)))
+         theta_b_tmp = theta_b(1) + PiBy2
+         call Zero2TwoPi(theta_b_tmp)
+         theta_b(1) = theta_b_tmp
+         m%DMST_u(indx)%blade_theta(j,k) = theta_b(1)
       end do
    end do
 
-   ! Streamtube corresponding to each blade node
+      ! Range of azimuth angles within each streamtube
+   do j = 1,p%NumBlNds
+      do i = 1,2*p%DMST%Nst
+         theta_st_r(1,i,j) = p%DMST%theta_st(i) - p%DMST%dTheta(j)/2.0_ReKi
+      end do
+      theta_st_r(1,1,j) = 0.0_ReKi
+      theta_st_r(2,1:2_IntKi*p%DMST%Nst-1,j) = theta_st_r(1,2:2_IntKi*p%DMST%Nst,j)
+      theta_st_r(2,2_IntKi*p%DMST%Nst,j) = TwoPi
+   end do
+
+      ! Streamtube corresponding to each blade node
    do k = 1,p%NumBlades
       do j = 1,p%NumBlNds
          do i = 1,2*p%DMST%Nst
-            if ( theta_b(k) >= theta_st_r(1,i,j) .and. theta_b(k) < theta_st_r(2,i,j) ) then
+            if ( m%DMST_u(indx)%blade_theta(j,k) >= theta_st_r(1,i,j) .and. m%DMST_u(indx)%blade_theta(j,k) < theta_st_r(2,i,j) ) then
                m%DMST_u(indx)%blade_st(j,k) = i
             end if
          end do
@@ -3731,7 +3742,15 @@ subroutine SetInputsForDMST(p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
    end do
 
    m%DMST_u(indx)%UserProp = u%UserProp
-   
+
+      ! Structural velocity and orientation matrix
+   do k = 1,p%numBlades
+      do j = 1,p%NumBlNds
+            m%DMST_u(indx)%Vstr(:,j,k) = matmul( u%BladeMotion(k)%Orientation(1:3,1:3,j), u%BladeMotion(k)%TranslationVel(1:3,j) ) ! airfoil coordinates
+            m%DMST_u(indx)%M_ag(:,:,j,k) = u%BladeMotion(k)%Orientation(1:3,1:3,j)
+      end do
+   end do
+
 end subroutine SetInputsForDMST
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This subroutine sets m%FVW_u(indx).
@@ -5049,7 +5068,7 @@ contains
 END SUBROUTINE Init_BEMTmodule
 !----------------------------------------------------------------------------------------------------------------------------------
 !> This routine initializes the DMST module from within AeroDyn.
-SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y, ErrStat, ErrMsg )
+SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, OtherState, y, ErrStat, ErrMsg )
 !..................................................................................................................................
    type(AD_InputFile),             intent(in   ) :: InputFileData  !< All the data in the AeroDyn input file
    type(RotInputFile),             intent(in   ) :: RotInputFileData !< Data in AeroDyn input file related to current rotor
@@ -5057,6 +5076,7 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
    type(DMST_InputType),           intent(  out) :: u              !< An initial guess for the input; input mesh must be defined
    type(RotParameterType),         intent(inout) :: p              !< Parameters ! intent out b/c we set the DMST parameters here
    type(AD_ParameterType),         intent(inout) :: p_AD           !< Parameters ! intent out b/c we set the DMST parameters here
+   type(DMST_OtherStateType),      intent(  out) :: OtherState     !< Initial other states
    type(DMST_OutputType),          intent(  out) :: y              !< Initial system outputs (outputs are not calculated;
                                                                    !!   only the output mesh is initialized)
    integer(IntKi),                 intent(  out) :: ErrStat        !< Error status of the operation
@@ -5120,7 +5140,7 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, y
       return
    end if
       
-   call DMST_Init( InitInp, u, p%DMST, y, Interval, InitOut, ErrStat2, ErrMsg2 )
+   call DMST_Init( InitInp, u, p%DMST, OtherState, y, Interval, InitOut, ErrStat2, ErrMsg2 )
       call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )   
             
    if ( .not. equalRealNos(Interval, p_AD%DT) ) &

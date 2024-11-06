@@ -53,6 +53,13 @@ IMPLICIT NONE
     TYPE(ProgDesc)  :: Version      !<  [-]
   END TYPE DMST_InitOutputType
 ! =======================
+! =========  DMST_OtherStateType  =======
+  TYPE, PUBLIC :: DMST_OtherStateType
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Stored blade structural velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Stored blade orientation matrix [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Stored blade azimuth [rad]
+  END TYPE DMST_OtherStateType
+! =======================
 ! =========  DMST_ParameterType  =======
   TYPE, PUBLIC :: DMST_ParameterType
     REAL(DbKi)  :: DT = 0.0_R8Ki      !< Time step [s]
@@ -75,6 +82,9 @@ IMPLICIT NONE
   TYPE, PUBLIC :: DMST_InputType
     REAL(ReKi)  :: omega = 0.0_ReKi      !< Rotor angular velocity [rad/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vinf      !< Free-stream velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Streamtube angle of each blade node in upstream and downstream sweeps [rad]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Structural velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Orientation matrix [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAndTwist      !< Local pitch + twist angle [rad]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_st      !< Streamtube corresponding to each blade node [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: UserProp      !< Optional user property for interpolating airfoils (per element per blade) [-]
@@ -243,6 +253,97 @@ subroutine DMST_UnPackInitOutput(RF, OutData)
    character(*), parameter            :: RoutineName = 'DMST_UnPackInitOutput'
    if (RF%ErrStat /= ErrID_None) return
    call NWTC_Library_UnpackProgDesc(RF, OutData%Version) ! Version 
+end subroutine
+
+subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, ErrStat, ErrMsg)
+   type(DMST_OtherStateType), intent(in) :: SrcOtherStateData
+   type(DMST_OtherStateType), intent(inout) :: DstOtherStateData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B8Ki)                  :: LB(4), UB(4)
+   integer(IntKi)                 :: ErrStat2
+   character(*), parameter        :: RoutineName = 'DMST_CopyOtherState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(SrcOtherStateData%Vstr)) then
+      LB(1:3) = lbound(SrcOtherStateData%Vstr, kind=B8Ki)
+      UB(1:3) = ubound(SrcOtherStateData%Vstr, kind=B8Ki)
+      if (.not. allocated(DstOtherStateData%Vstr)) then
+         allocate(DstOtherStateData%Vstr(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOtherStateData%Vstr.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOtherStateData%Vstr = SrcOtherStateData%Vstr
+   end if
+   if (allocated(SrcOtherStateData%M_ag)) then
+      LB(1:4) = lbound(SrcOtherStateData%M_ag, kind=B8Ki)
+      UB(1:4) = ubound(SrcOtherStateData%M_ag, kind=B8Ki)
+      if (.not. allocated(DstOtherStateData%M_ag)) then
+         allocate(DstOtherStateData%M_ag(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3),LB(4):UB(4)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOtherStateData%M_ag.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOtherStateData%M_ag = SrcOtherStateData%M_ag
+   end if
+   if (allocated(SrcOtherStateData%blade_theta)) then
+      LB(1:2) = lbound(SrcOtherStateData%blade_theta, kind=B8Ki)
+      UB(1:2) = ubound(SrcOtherStateData%blade_theta, kind=B8Ki)
+      if (.not. allocated(DstOtherStateData%blade_theta)) then
+         allocate(DstOtherStateData%blade_theta(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOtherStateData%blade_theta.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOtherStateData%blade_theta = SrcOtherStateData%blade_theta
+   end if
+end subroutine
+
+subroutine DMST_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
+   type(DMST_OtherStateType), intent(inout) :: OtherStateData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   character(*), parameter        :: RoutineName = 'DMST_DestroyOtherState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   if (allocated(OtherStateData%Vstr)) then
+      deallocate(OtherStateData%Vstr)
+   end if
+   if (allocated(OtherStateData%M_ag)) then
+      deallocate(OtherStateData%M_ag)
+   end if
+   if (allocated(OtherStateData%blade_theta)) then
+      deallocate(OtherStateData%blade_theta)
+   end if
+end subroutine
+
+subroutine DMST_PackOtherState(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(DMST_OtherStateType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'DMST_PackOtherState'
+   if (RF%ErrStat >= AbortErrLev) return
+   call RegPackAlloc(RF, InData%Vstr)
+   call RegPackAlloc(RF, InData%M_ag)
+   call RegPackAlloc(RF, InData%blade_theta)
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine DMST_UnPackOtherState(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(DMST_OtherStateType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'DMST_UnPackOtherState'
+   integer(B8Ki)   :: LB(4), UB(4)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call RegUnpackAlloc(RF, OutData%Vstr); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%M_ag); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%blade_theta); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
@@ -417,7 +518,7 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(3), UB(3)
+   integer(B8Ki)                  :: LB(4), UB(4)
    integer(IntKi)                 :: ErrStat2
    character(*), parameter        :: RoutineName = 'DMST_CopyInput'
    ErrStat = ErrID_None
@@ -434,6 +535,42 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
          end if
       end if
       DstInputData%Vinf = SrcInputData%Vinf
+   end if
+   if (allocated(SrcInputData%blade_theta)) then
+      LB(1:2) = lbound(SrcInputData%blade_theta, kind=B8Ki)
+      UB(1:2) = ubound(SrcInputData%blade_theta, kind=B8Ki)
+      if (.not. allocated(DstInputData%blade_theta)) then
+         allocate(DstInputData%blade_theta(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%blade_theta.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%blade_theta = SrcInputData%blade_theta
+   end if
+   if (allocated(SrcInputData%Vstr)) then
+      LB(1:3) = lbound(SrcInputData%Vstr, kind=B8Ki)
+      UB(1:3) = ubound(SrcInputData%Vstr, kind=B8Ki)
+      if (.not. allocated(DstInputData%Vstr)) then
+         allocate(DstInputData%Vstr(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%Vstr.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%Vstr = SrcInputData%Vstr
+   end if
+   if (allocated(SrcInputData%M_ag)) then
+      LB(1:4) = lbound(SrcInputData%M_ag, kind=B8Ki)
+      UB(1:4) = ubound(SrcInputData%M_ag, kind=B8Ki)
+      if (.not. allocated(DstInputData%M_ag)) then
+         allocate(DstInputData%M_ag(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3),LB(4):UB(4)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%M_ag.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%M_ag = SrcInputData%M_ag
    end if
    if (allocated(SrcInputData%PitchAndTwist)) then
       LB(1:2) = lbound(SrcInputData%PitchAndTwist, kind=B8Ki)
@@ -483,6 +620,15 @@ subroutine DMST_DestroyInput(InputData, ErrStat, ErrMsg)
    if (allocated(InputData%Vinf)) then
       deallocate(InputData%Vinf)
    end if
+   if (allocated(InputData%blade_theta)) then
+      deallocate(InputData%blade_theta)
+   end if
+   if (allocated(InputData%Vstr)) then
+      deallocate(InputData%Vstr)
+   end if
+   if (allocated(InputData%M_ag)) then
+      deallocate(InputData%M_ag)
+   end if
    if (allocated(InputData%PitchAndTwist)) then
       deallocate(InputData%PitchAndTwist)
    end if
@@ -501,6 +647,9 @@ subroutine DMST_PackInput(RF, Indata)
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%omega)
    call RegPackAlloc(RF, InData%Vinf)
+   call RegPackAlloc(RF, InData%blade_theta)
+   call RegPackAlloc(RF, InData%Vstr)
+   call RegPackAlloc(RF, InData%M_ag)
    call RegPackAlloc(RF, InData%PitchAndTwist)
    call RegPackAlloc(RF, InData%blade_st)
    call RegPackAlloc(RF, InData%UserProp)
@@ -511,12 +660,15 @@ subroutine DMST_UnPackInput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_InputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackInput'
-   integer(B8Ki)   :: LB(3), UB(3)
+   integer(B8Ki)   :: LB(4), UB(4)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%omega); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Vinf); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%blade_theta); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Vstr); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%M_ag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%PitchAndTwist); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%blade_st); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%UserProp); if (RegCheckErr(RF, RoutineName)) return
