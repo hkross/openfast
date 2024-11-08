@@ -38,6 +38,7 @@ typedef   ^                            InitOutputType                ProgDesc   
 typedef   ^                            OtherStateType                ReKi                     Vstr                            {:}{:}{:}     -       -          "Stored blade structural velocity" m/s
 typedef   ^                            OtherStateType                ReKi                     M_ag                            {:}{:}{:}{:}  -       -          "Stored blade orientation matrix" -
 typedef   ^                            OtherStateType                ReKi                     blade_theta                     {:}{:}        -       -          "Stored blade azimuth" rad
+typedef   ^                            OtherStateType                ReKi                     indf                            {:}{:}        -       -          "Stored induction factor" -
 #
 # ..... Parameters ................................................................................................................
 # Define parameters here:
@@ -72,3 +73,4 @@ typedef   ^                            ^                             ReKi       
 # ..... Outputs ...................................................................................................................
 # Define outputs that are contained on the mesh here:
 typedef   ^                            OutputType                    ReKi                     Vind                            {:}{:}{:}  -          -          "Global induced velocity" m/s
+typedef   ^                            OutputType                    ReKi                     indf                            {:}{:}     -          -          "Induction factor at each blade node" -

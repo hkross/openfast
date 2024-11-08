@@ -1852,7 +1852,7 @@ subroutine AD_UpdateStates( t, n, u, utimes, p, x, xd, z, OtherState, m, errStat
 
    elseif (p%Wake_Mod == WakeMod_DMST) then
       do iR = 1,size(p%rotors)
-         call DMST_UpdateStates(p%rotors(iR)%DMST, m%rotors(iR)%DMST_u(:), OtherState%rotors(iR)%DMST, errStat2, errMsg2)
+         call DMST_UpdateStates(p%rotors(iR)%DMST, m%rotors(iR)%DMST_u(:), m%rotors(iR)%DMST_y, OtherState%rotors(iR)%DMST, errStat2, errMsg2)
          if (Failed()) return
       end do
 

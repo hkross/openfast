@@ -58,6 +58,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Stored blade structural velocity [m/s]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Stored blade orientation matrix [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Stored blade azimuth [rad]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: indf      !< Stored induction factor [-]
   END TYPE DMST_OtherStateType
 ! =======================
 ! =========  DMST_ParameterType  =======
@@ -93,6 +94,7 @@ IMPLICIT NONE
 ! =========  DMST_OutputType  =======
   TYPE, PUBLIC :: DMST_OutputType
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vind      !< Global induced velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: indf      !< Induction factor at each blade node [-]
   END TYPE DMST_OutputType
 ! =======================
 CONTAINS
@@ -302,6 +304,18 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
       end if
       DstOtherStateData%blade_theta = SrcOtherStateData%blade_theta
    end if
+   if (allocated(SrcOtherStateData%indf)) then
+      LB(1:2) = lbound(SrcOtherStateData%indf, kind=B8Ki)
+      UB(1:2) = ubound(SrcOtherStateData%indf, kind=B8Ki)
+      if (.not. allocated(DstOtherStateData%indf)) then
+         allocate(DstOtherStateData%indf(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOtherStateData%indf.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOtherStateData%indf = SrcOtherStateData%indf
+   end if
 end subroutine
 
 subroutine DMST_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
@@ -320,6 +334,9 @@ subroutine DMST_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
    if (allocated(OtherStateData%blade_theta)) then
       deallocate(OtherStateData%blade_theta)
    end if
+   if (allocated(OtherStateData%indf)) then
+      deallocate(OtherStateData%indf)
+   end if
 end subroutine
 
 subroutine DMST_PackOtherState(RF, Indata)
@@ -330,6 +347,7 @@ subroutine DMST_PackOtherState(RF, Indata)
    call RegPackAlloc(RF, InData%Vstr)
    call RegPackAlloc(RF, InData%M_ag)
    call RegPackAlloc(RF, InData%blade_theta)
+   call RegPackAlloc(RF, InData%indf)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -344,6 +362,7 @@ subroutine DMST_UnPackOtherState(RF, OutData)
    call RegUnpackAlloc(RF, OutData%Vstr); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%M_ag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%blade_theta); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
@@ -697,6 +716,18 @@ subroutine DMST_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrM
       end if
       DstOutputData%Vind = SrcOutputData%Vind
    end if
+   if (allocated(SrcOutputData%indf)) then
+      LB(1:2) = lbound(SrcOutputData%indf, kind=B8Ki)
+      UB(1:2) = ubound(SrcOutputData%indf, kind=B8Ki)
+      if (.not. allocated(DstOutputData%indf)) then
+         allocate(DstOutputData%indf(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstOutputData%indf.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstOutputData%indf = SrcOutputData%indf
+   end if
 end subroutine
 
 subroutine DMST_DestroyOutput(OutputData, ErrStat, ErrMsg)
@@ -709,6 +740,9 @@ subroutine DMST_DestroyOutput(OutputData, ErrStat, ErrMsg)
    if (allocated(OutputData%Vind)) then
       deallocate(OutputData%Vind)
    end if
+   if (allocated(OutputData%indf)) then
+      deallocate(OutputData%indf)
+   end if
 end subroutine
 
 subroutine DMST_PackOutput(RF, Indata)
@@ -717,6 +751,7 @@ subroutine DMST_PackOutput(RF, Indata)
    character(*), parameter         :: RoutineName = 'DMST_PackOutput'
    if (RF%ErrStat >= AbortErrLev) return
    call RegPackAlloc(RF, InData%Vind)
+   call RegPackAlloc(RF, InData%indf)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -729,6 +764,7 @@ subroutine DMST_UnPackOutput(RF, OutData)
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpackAlloc(RF, OutData%Vind); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 END MODULE DMST_Types
 !ENDOFREGISTRYGENERATEDFILE

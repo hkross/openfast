@@ -160,6 +160,12 @@ subroutine DMST_InitOtherStates( OtherState, p, errStat, errMsg )
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for OtherState%blade_theta.', errStat, errMsg, RoutineName )
       return
    end if
+
+   allocate ( OtherState%indf( 2_IntKi*p%Nst, p%numBladeNodes ), STAT = errStat2 )
+   if ( errStat2 /= 0 ) then
+      call SetErrStat( ErrID_Fatal, 'Error allocating memory for OtherState%indf.', errStat, errMsg, RoutineName )
+      return
+   end if
    
    ! Values of the OtherStates are initialized in DMST_ReInit()
 
@@ -252,8 +258,10 @@ subroutine DMST_AllocOutput( y, p, errStat, errMsg )
    errMsg  = ""
 
    call allocAry( y%Vind, 3_IntKi, p%numBladeNodes, p%numBlades, 'y%Vind', errStat2, errMsg2 ); call setErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+   call allocAry( y%indf, p%numBladeNodes, p%numBlades, 'y%indf', errStat2, errMsg2 ); call setErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
 
    y%Vind = 0.0_ReKi
+   y%indf = 0.0_ReKi
 
 end subroutine DMST_AllocOutput
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -328,6 +336,7 @@ subroutine DMST_ReInit(p,OtherState,ErrStat,ErrMsg)
    OtherState%Vstr = 9999.0_ReKi
    OtherState%M_ag = 0.0_ReKi
    OtherState%blade_theta = 0.0_ReKi
+   OtherState%indf = 9999.0_ReKi
     
 end subroutine DMST_ReInit
 ! !----------------------------------------------------------------------------------------------------------------------------------
@@ -377,11 +386,12 @@ end subroutine DMST_ReInit
 
 ! END SUBROUTINE BEMT_End
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine DMST_UpdateStates(p, u, OtherState, errStat, errMsg)
+subroutine DMST_UpdateStates(p, u, y, OtherState, errStat, errMsg)
 !
 !..................................................................................................................................
    type(DMST_ParameterType),            intent(in   ) :: p          ! Parameters
    type(DMST_InputType),                intent(in   ) :: u(2)       ! Inputs at t and t + dt
+   type(DMST_OutputType),               intent(in   ) :: y          ! Outputs at t
    type(DMST_OtherStateType),           intent(inout) :: OtherState ! Input: Other states at t; Output: Other states at t + Interval
    integer(IntKi),                      intent(  out) :: errStat    ! Error status of the operation
    character(*),                        intent(  out) :: errMsg     ! Error message if ErrStat /= ErrID_None
@@ -395,10 +405,11 @@ subroutine DMST_UpdateStates(p, u, OtherState, errStat, errMsg)
    do k = 1,p%numBlades
       do j = 1,p%numBladeNodes
          if (u(2)%blade_st(j,k) <= p%Nst) then
-            OtherState%Vstr(:,u(2)%blade_st(j,k),j) = u(2)%Vstr(:,j,k)
-            OtherState%M_ag(:,:,u(2)%blade_st(j,k),j) = u(2)%M_ag(:,:,j,k)
-            OtherState%blade_theta(u(2)%blade_st(j,k),j) = u(2)%blade_theta(j,k)
+            OtherState%Vstr(:,u(2)%blade_st(j,k),j) = u(2)%Vstr(:,j,k) ! u at t+dt
+            OtherState%M_ag(:,:,u(2)%blade_st(j,k),j) = u(2)%M_ag(:,:,j,k) ! u at t+dt
+            OtherState%blade_theta(u(2)%blade_st(j,k),j) = u(2)%blade_theta(j,k) ! u at t+dt
          end if
+         OtherState%indf(u(1)%blade_st(j,k),j) = y%indf(j,k) ! u,y at t
       end do
    end do
 
@@ -491,25 +502,29 @@ subroutine calculate_CTbe( j, k, Vinf, blade_theta, M_ag, Vstr, p, u, AFinfo, CT
 
 end subroutine calculate_CTbe
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_prev ) !TO DO
+subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, Nst, indf_hist, blade_st, crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
    ! This routine is called from DMST_CalcOutput and calculates the final induction factor in a streamtube.
    !..................................................................................................................................
-   integer(IntKi),                 intent(in   )                   :: DMSTMod         ! Type of momentum theory model
-   real(ReKi),                     intent(in   )                   :: indf(:)         ! Array of induction factors
-   real(ReKi),                     intent(in   )                   :: tol             ! Tolerance for checking induction factor values
-   integer(IntKi),                 intent(in   )                   :: crossPts(:)     ! Crossing points between CTmo and CTbe
-   integer(IntKi),                 intent(in   )                   :: crossPtsSum     ! Number of crossing points in a streamtube
-   real(ReKi),                     intent(in   )                   :: CTmo(:)         ! Thrust coefficient from linear momentum theory
-   real(ReKi),                     intent(in   )                   :: CTbe(:)         ! Thrust coefficient from blade element theory
-   real(ReKi),                     intent(inout)                   :: indf_final_tmp  ! Final induction factor in a streamtube
-   real(ReKi),                     intent(inout)                   :: indf_prev       ! Final induction factor of the current/previous streamtube
+   integer(IntKi),                 intent(in   )                  :: DMSTMod              ! Type of momentum theory model
+   real(ReKi),                     intent(in   )                  :: indf(:)              ! Array of induction factors
+   real(ReKi),                     intent(in   )                  :: tol                  ! Tolerance for checking induction factor values
+   integer(IntKi),                 intent(in   )                  :: Nst                  ! Number of streamtubes   
+   real(ReKi),                     intent(in   )                  :: indf_hist(:)         ! Induction factors stored per streamtube
+   integer(IntKi),                 intent(in   )                  :: blade_st             ! Streamtube of the current blade node
+   integer(IntKi),                 intent(in   )                  :: crossPts(:)          ! Crossing points between CTmo and CTbe
+   integer(IntKi),                 intent(in   )                  :: crossPtsSum          ! Number of crossing points for a blade node
+   real(ReKi),                     intent(in   )                  :: CTmo(:)              ! Thrust coefficient from linear momentum theory
+   real(ReKi),                     intent(in   )                  :: CTbe(:)              ! Thrust coefficient from blade element theory
+   real(ReKi),                     intent(inout)                  :: indf_final_tmp       ! Final induction factor for a blade node
+   real(ReKi),                     intent(inout)                  :: indf_final_tmp_store ! Stored final induction factor for a blade node
 
       ! Local variables
-   real(ReKi),     dimension(crossPtsSum)                          :: CTfinal         ! Array of final CT values
-   real(ReKi),     dimension(crossPtsSum)                          :: indf_tmp        ! Temporary array of induction factors
-   real(ReKi),     dimension(crossPtsSum)                          :: indf_diff       ! Different between indf_tmp and indf_prev
-   integer(IntKi)                                                  :: i               ! Loops through induction factors
-   integer(IntKi)                                                  :: m               ! Counter
+   real(ReKi),     dimension(crossPtsSum)                         :: CTfinal          ! Array of final CT values
+   real(ReKi),     dimension(crossPtsSum)                         :: indf_tmp         ! Temporary array of induction factors
+   real(ReKi),     dimension(crossPtsSum)                         :: indf_diff        ! Difference between indf_tmp and indf_hist
+   integer(IntKi)                                                 :: blade_st_ind     ! Index of streamtube just before streamtube of current blade node
+   integer(IntKi)                                                 :: i                ! Loops through induction factors
+   integer(IntKi)                                                 :: m                ! Counter
 
       ! Initialize some local values
    CTfinal = 0.0
@@ -554,20 +569,25 @@ subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, crossPts, crossPt
       end if
    end do
 
-   !if ( crossPtsSum > 1_IntKi ) then
-   !   do i = 1,size(indf_tmp)
-   !      indf_diff(i) = abs(indf_tmp(i) - indf_prev)
-   !   end do
-   !   indf_final = indf_tmp(minloc(indf_diff,1_IntKi))
-   !else if ( crossPtsSum == 1_IntKi ) then
-   if ( crossPtsSum == 0_IntKi ) then
-      indf_final_tmp = 1.0
-   else
-      indf_final_tmp = indf_tmp(1)
+   if ( blade_st > 1_IntKi ) then
+      blade_st_ind = blade_st - 1_IntKi
+   elseif ( blade_st == 1_IntKi ) then
+      blade_st_ind = 2_IntKi*Nst
    end if
-   !end if
 
-   indf_prev = indf_final_tmp
+   if ( crossPtsSum > 1_IntKi .and. indf_hist(blade_st_ind) < 9999.0_ReKi ) then
+         do i = 1,size(indf_tmp)
+            indf_diff(i) = abs(indf_tmp(i) - indf_hist(blade_st_ind))
+         end do
+         indf_final_tmp = indf_tmp(minloc(indf_diff,1_IntKi))
+         indf_final_tmp_store = indf_final_tmp
+   else if ( crossPtsSum == 1_IntKi ) then
+      indf_final_tmp = indf_tmp(1)
+      indf_final_tmp_store = indf_final_tmp
+   else
+      indf_final_tmp = 1.0_ReKi
+      indf_final_tmp_store = 9999.0_ReKi
+   end if
 
 end subroutine calculate_Inductions_from_DMST
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -670,25 +690,25 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
    character(*),                   intent(  out)                           :: errMsg         ! Error message if ErrStat /= ErrID_None
 
       ! Local variables
-   real(ReKi)                                                                   :: blade_theta    ! Azimuthal location of each blade node
-   real(ReKi),     dimension(3_IntKi,3_IntKi)                                   :: M_ag           ! Blade orientation matrix
-   real(ReKi),     dimension(3_IntKi)                                           :: Vstr           ! Structural velocity, airfoil coordinates
-   real(ReKi),     dimension(3_IntKi)                                           :: Vinf           ! Inflow velocity, global coordinates
-   real(ReKi),     dimension(size(p%indf))                                      :: CTmo           ! Thrust coefficient from linear momentum theory
-   real(ReKi),     dimension(size(p%indf))                                      :: CTbe           ! Thrust coefficient from blade element theory
-   real(ReKi),     dimension(size(p%indf))                                      :: CTdiff         ! Difference between CTbe and CTmo
-   integer(IntKi), dimension(size(p%indf)-1_IntKi)                              :: crossPts       ! Crossing points between CTmo and CTbe
-   integer(IntKi)                                                               :: crossPtsSum    ! Number of crossing points for a blade node
-   !integer(IntKi), dimension(p%numBladeNodes)                                   :: crossPtsInd    ! Index of the first streamtube with a single crossing point
-   real(ReKi)                                                                   :: indf_final_tmp ! Temporary storage for final induction factors
-   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final_u   ! Final induction factors for the upstream sweep
-   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final     ! Final induction factors
-   real(ReKi)                                                                   :: indf_prev      ! Final induction factor of the current/previous streamtube
-   real(ReKi),     dimension(3_IntKi,p%numBladeNodes,p%numBlades)               :: Vind_st        ! Induced velocity, global coordinates
-   integer(IntKi)                                                               :: i              ! Loops through induction factors
-   integer(IntKi)                                                               :: j              ! Loops through nodes
-   integer(IntKi)                                                               :: k              ! Loops through blades
-   integer(IntKi)                                                               :: m              ! Loops through sweeps
+   real(ReKi)                                                                   :: blade_theta          ! Azimuthal location of each blade node
+   real(ReKi),     dimension(3_IntKi,3_IntKi)                                   :: M_ag                 ! Blade orientation matrix
+   real(ReKi),     dimension(3_IntKi)                                           :: Vstr                 ! Structural velocity, airfoil coordinates
+   real(ReKi),     dimension(3_IntKi)                                           :: Vinf                 ! Inflow velocity, global coordinates
+   real(ReKi),     dimension(size(p%indf))                                      :: CTmo                 ! Thrust coefficient from linear momentum theory
+   real(ReKi),     dimension(size(p%indf))                                      :: CTbe                 ! Thrust coefficient from blade element theory
+   real(ReKi),     dimension(size(p%indf))                                      :: CTdiff               ! Difference between CTbe and CTmo
+   integer(IntKi), dimension(size(p%indf)-1_IntKi)                              :: crossPts             ! Crossing points between CTmo and CTbe
+   integer(IntKi)                                                               :: crossPtsSum          ! Number of crossing points for a blade node
+   real(ReKi)                                                                   :: indf_final_tmp       ! Temporary storage for final induction factors
+   real(ReKi)                                                                   :: indf_final_tmp_store ! Temporary storage for stored final induction factors
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final_store     ! Final stored induction factors   
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final_u         ! Final induction factors for the upstream sweep
+   real(ReKi),     dimension(p%numBladeNodes,p%numBlades)                       :: indf_final           ! Final induction factors
+   real(ReKi),     dimension(3_IntKi,p%numBladeNodes,p%numBlades)               :: Vind_st              ! Induced velocity, global coordinates
+   integer(IntKi)                                                               :: i                    ! Loops through induction factors
+   integer(IntKi)                                                               :: j                    ! Loops through nodes
+   integer(IntKi)                                                               :: k                    ! Loops through blades
+   integer(IntKi)                                                               :: m                    ! Loops through sweeps
    character(*), parameter                                                      :: RoutineName = 'DMST_CalcOutput'
 
       ! Initialize some output values
@@ -720,7 +740,6 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
             crossPts = 0.0
             crossPtsSum = 0.0
             indf_final_tmp = 0.0
-            indf_prev = 0.0
 
             if ( m == 1_IntKi .or. m == 2_IntKi .and. u%blade_st(j,k) > p%Nst ) then
 
@@ -741,11 +760,10 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
                else
                   if ( p%DMSTMod == 1 ) then
                      Vinf(1) = (2.0_ReKi*indf_final_u(j,k) - 1.0_ReKi)*u%Vinf(1,j,k)
-                     Vinf(2:3) = u%Vinf(2:3,j,k)
                   else if ( p%DMSTMod == 2 ) then
                      Vinf(1) = indf_final_u(j,k)/(2.0_ReKi - indf_final_u(j,k))*u%Vinf(1,j,k)
-                     Vinf(2:3) = u%Vinf(2:3,j,k)
                   end if
+                  Vinf(2:3) = u%Vinf(2:3,j,k)
                end if
 
                   ! Calculate the thrust coefficient from blade element theory
@@ -769,22 +787,13 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
                      crossPtsSum = crossPtsSum + crossPts(i)
                   end do
 
-                     ! Identify first streamtube with a single crossing point **
-                  !do k = 1,p%numBladeNodes
-                  !   do j = 1,p%Nst
-                  !      if ( crossPtsSum(j,k) == 1_IntKi ) then
-                  !        crossPtsInd(k) = j
-                  !        exit
-                  !     end if
-                  !  end do 
-                  !end do
-
                      ! Calculate final thrust coefficients and induction factors
-                  call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_prev )
+                  call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, p%Nst, OtherState%indf(:,j), u%blade_st(j,k), crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
 
                else
 
                   indf_final_tmp = 1.0_ReKi
+                  indf_final_tmp_store = 9999.0_ReKi
 
                end if
 
@@ -793,6 +802,7 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
                   indf_final_u(j,k) = indf_final_tmp
                else
                   indf_final(j,k) = indf_final_tmp
+                  indf_final_store(j,k) = indf_final_tmp_store
                end if
 
             end if
@@ -817,6 +827,7 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
 
       ! Output induced velocity values at blade nodes
    y%Vind = Vind_st
+   y%indf = indf_final_store
 
 end subroutine DMST_CalcOutput
 !----------------------------------------------------------------------------------------------------------------------------------
