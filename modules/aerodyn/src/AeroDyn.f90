@@ -2252,7 +2252,7 @@ subroutine RotWriteOutputs( t, u, RotInflow, p, p_AD, x, xd, z, OtherState, y, m
 
    integer(intKi)                               :: ErrStat2
    character(ErrMsgLen)                         :: ErrMsg2
-   character(*), parameter                      :: RoutineName = 'RotCalcOutput'
+   character(*), parameter                      :: RoutineName = 'RotWriteOutputs'
    real(R8Ki)                                   :: x_hat_disk(3)
 !   LOGICAL                                      :: CalcWriteOutput   
    !-------------------------------------------------------   
@@ -3274,7 +3274,7 @@ subroutine SetInputsForBEMT(p, p_AD, u, RotInflow, m, indx, errStat, errMsg)
          ! Determine current azimuth angle and pitch axis vector of blade k, element j
          call Calculate_MeshOrientation_Rel2Hub(u%BladeMotion(k), u%HubMotion, x_hat_disk, m%orientationAnnulus(:,:,:,k), elemPosRelToHub_save=elemPosRelToHub, elemPosRotorProj_save=elemPosRotorProj)
          ! Twist (aero+elastic), Toe, Cant (instantaneous and local), include elastic deformation
-         call TwistToeCant_FromLocalPolar(u%BladeMotion(k), m%orientationAnnulus(:,:,:,k), thetaBladeNds, m%Toe(:,k), m%Cant(:,k))
+         call TwistToeCant_FromLocalPolar(u%BladeMotion(k), m%orientationAnnulus(:,:,:,k), thetaBladeNds(:,k), m%Toe(:,k), m%Cant(:,k))
 
          !..........................
          ! Compute local radius
@@ -3792,7 +3792,7 @@ subroutine SetInputsForFVW(p, u, m, errStat, errMsg)
          elseif (p%rotors(iR)%AeroProjMod==APM_BEM_Polar) then
             do k=1,p%rotors(iR)%numBlades
                call Calculate_MeshOrientation_Rel2Hub(u(tIndx)%rotors(iR)%BladeMotion(k), u(tIndx)%rotors(iR)%HubMotion, x_hat_disk, m%rotors(iR)%orientationAnnulus(:,:,:,k))
-               call TwistToeCant_FromLocalPolar(u(tIndx)%rotors(iR)%BladeMotion(k), m%rotors(iR)%orientationAnnulus(:,:,:,k), thetaBladeNds, m%rotors(iR)%Toe(:,k), m%rotors(iR)%Cant(:,k))
+               call TwistToeCant_FromLocalPolar(u(tIndx)%rotors(iR)%BladeMotion(k), m%rotors(iR)%orientationAnnulus(:,:,:,k), thetaBladeNds(:,k), m%rotors(iR)%Toe(:,k), m%rotors(iR)%Cant(:,k))
             enddo
 
          else if (p%rotors(iR)%AeroProjMod==APM_LiftingLine) then
@@ -4620,16 +4620,18 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, calcCrvAngle, ErrSt
    if (InitInp%Linearize) then
 
       if (InputFileData%Wake_Mod /= WakeMod_None .and. InputFileData%Wake_Mod /= WakeMod_BEMT) then 
-         call SetErrStat( ErrID_Fatal, 'WakeMod must be 0 or 1 for linearization.', ErrStat, ErrMsg, RoutineName )
+         call SetErrStat( ErrID_Fatal, 'Wake_Mod must be 0 or 1 for linearization.', ErrStat, ErrMsg, RoutineName )
       endif
 
       if (InputFileData%UA_Init%UAMod /= UA_None .and. InputFileData%UA_Init%UAMod /= UA_HGM .and. InputFileData%UA_Init%UAMod /= UA_HGMV .and. InputFileData%UA_Init%UAMod /= UA_OYE) then
          call SetErrStat( ErrID_Fatal, 'UA_Mod must be 0, 4, 5, or 6 for linearization.', ErrStat, ErrMsg, RoutineName )
       end if
 
-      if (InputFileData%DBEMT_Mod /= DBEMT_None .and. InputFileData%DBEMT_Mod /= DBEMT_cont_tauConst) then
-         call SetErrStat( ErrID_Fatal, 'DBEMT Mod must be 0 or 3 (continuous formulation with constant tau1) for linearization. Set DBEMT_Mod=0,3.', ErrStat, ErrMsg, RoutineName )
-      end if
+      select case(InputFileData%DBEMT_Mod)
+      case (DBEMT_None, DBEMT_frozen, DBEMT_cont_tauConst)
+      case default
+         call SetErrStat( ErrID_Fatal, 'DBEMT_Mod must be -1 (frozen), 0 (none), or 3 (continuous formulation with constant tau1) for linearization. Set DBEMT_Mod=-1,0,3.', ErrStat, ErrMsg, RoutineName )
+      end select
 
       if (InputFileData%NacelleDrag) then
          call SetErrStat( ErrID_Fatal, 'Nacelle drag cannot currently be used for linearization. Set NacelleDrag = false.', ErrStat, ErrMsg, RoutineName )

@@ -65,6 +65,7 @@ typedef  ^        InitInputType     FlowFieldType        *FlowField        -  - 
 typedef  ^        InitOutputType    CHARACTER(ChanLen)   WriteOutputHdr   {:} - -   "Names of the output-to-file channels"   -
 typedef  ^        InitOutputType    CHARACTER(ChanLen)   WriteOutputUnt   {:} - -   "Units of the output-to-file channels"   -
 typedef  ^        InitOutputType    ProgDesc             Ver               -  - -   "This module's name, version, and date"   -
+typedef  ^        InitOutputType    ReKi                 AirDens           -  - -   "Air density" "kg/m^3"
 
 
 # ..... Inputs ....................................................................................................................
@@ -78,7 +79,7 @@ typedef  ^        InputType         ReKi                 BlPitch           -  - 
 
 # ..... Outputs ...................................................................................................................
 # outputs on meshes:
-typedef  ^        OutputType        MeshType             AeroLoads         -  - -   "Mesh containing the forces and moments from the aero loading" -
+typedef  ^        OutputType        MeshType             AeroLoads         -  - -   "Mesh containing the forces and moments from the aero loading (at HubMotion mesh)" -
 #TODO: any mesh for visualization of blades/rotor disk?
 # outputs not on meshes:
 typedef  ^        OutputType        ReKi                 YawErr            -  - -   "Nacelle-yaw error, i.e., the angle about positive Z from the rotor centerline to the rotor-disk-averaged relative wind velocity (ambient + rotor  motion), both projected onto the horizontal plane" rad

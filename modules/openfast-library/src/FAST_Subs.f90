@@ -547,80 +547,8 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
          RETURN
       END IF
 
-      IF ( p_FAST%CompServo == Module_SrvD ) THEN !assign the number of gates to ServD
-         if (allocated(IfW%y%lidar%LidSpeed)) then    ! make sure we have the array allocated before setting it
-            CALL AllocAry(Init%InData_SrvD%LidSpeed, size(IfW%y%lidar%LidSpeed), 'Init%InData_SrvD%LidSpeed',     errStat2, ErrMsg2)
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-            Init%InData_SrvD%LidSpeed = IfW%y%lidar%LidSpeed
-         endif
-         if (allocated(IfW%y%lidar%MsrPositionsX)) then    ! make sure we have the array allocated before setting it
-            CALL AllocAry(Init%InData_SrvD%MsrPositionsX, size(IfW%y%lidar%MsrPositionsX), 'Init%InData_SrvD%MsrPositionsX',     errStat2, ErrMsg2)
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-            Init%InData_SrvD%MsrPositionsX = IfW%y%lidar%MsrPositionsX
-         endif
-         if (allocated(IfW%y%lidar%MsrPositionsY)) then    ! make sure we have the array allocated before setting it
-            CALL AllocAry(Init%InData_SrvD%MsrPositionsY, size(IfW%y%lidar%MsrPositionsY), 'Init%InData_SrvD%MsrPositionsY',     errStat2, ErrMsg2)
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-            Init%InData_SrvD%MsrPositionsY = IfW%y%lidar%MsrPositionsY
-         endif
-         if (allocated(IfW%y%lidar%MsrPositionsZ)) then    ! make sure we have the array allocated before setting it
-            CALL AllocAry(Init%InData_SrvD%MsrPositionsZ, size(IfW%y%lidar%MsrPositionsZ), 'Init%InData_SrvD%MsrPositionsZ',     errStat2, ErrMsg2)
-            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-            Init%InData_SrvD%MsrPositionsZ = IfW%y%lidar%MsrPositionsZ
-         endif
-         Init%InData_SrvD%SensorType    = IfW%p%lidar%SensorType
-         Init%InData_SrvD%NumBeam       = IfW%p%lidar%NumBeam
-         Init%InData_SrvD%NumPulseGate  = IfW%p%lidar%NumPulseGate
-         Init%InData_SrvD%PulseSpacing  = IfW%p%lidar%PulseSpacing
-      END IF
-
-
    ELSEIF ( p_FAST%CompInflow == Module_ExtInfw ) THEN
-
-      IF ( PRESENT(ExternInitData) ) THEN
-         Init%InData_ExtInfw%NumActForcePtsBlade = ExternInitData%NumActForcePtsBlade
-         Init%InData_ExtInfw%NumActForcePtsTower = ExternInitData%NumActForcePtsTower
-      ELSE
-         CALL SetErrStat( ErrID_Fatal, 'ExternalInflow integration can be used only with external input data (not the stand-alone executable).', ErrStat, ErrMsg, RoutineName )
-         CALL Cleanup()
-         RETURN
-      END IF
-      ! get blade and tower info from AD.  Assumption made that all blades have same spanwise characteristics
-      Init%InData_ExtInfw%BladeLength = Init%OutData_AD%rotors(1)%BladeProps(1)%BlSpn(Init%OutData_AD%rotors(1)%BladeProps(1)%NumBlNds)
-      if (allocated(Init%OutData_AD%rotors(1)%TwrElev)) then
-         Init%InData_ExtInfw%TowerHeight     = Init%OutData_AD%rotors(1)%TwrElev(SIZE(Init%OutData_AD%rotors(1)%TwrElev)) - Init%OutData_AD%rotors(1)%TwrElev(1)   ! TwrElev is based on ground or MSL.  Need flexible tower length and first node
-         Init%InData_ExtInfw%TowerBaseHeight = Init%OutData_AD%rotors(1)%TwrElev(1)
-         ALLOCATE(Init%InData_ExtInfw%StructTwrHNodes( SIZE(Init%OutData_AD%rotors(1)%TwrElev)),  STAT=ErrStat2)
-         Init%InData_ExtInfw%StructTwrHNodes(:) = Init%OutData_AD%rotors(1)%TwrElev(:)
-      else
-         Init%InData_ExtInfw%TowerHeight     = 0.0_ReKi
-         Init%InData_ExtInfw%TowerBaseHeight = 0.0_ReKi
-      endif
-      ALLOCATE(Init%InData_ExtInfw%StructBldRNodes(Init%OutData_AD%rotors(1)%BladeProps(1)%NumBlNds),  STAT=ErrStat2)
-      Init%InData_ExtInfw%StructBldRNodes(:) = Init%OutData_AD%rotors(1)%BladeProps(1)%BlSpn(:)
-      IF (ErrStat2 /= 0) THEN
-         CALL SetErrStat(ErrID_Fatal,"Error allocating ExtInfw%InitInput.",ErrStat,ErrMsg,RoutineName)
-         CALL Cleanup()
-         RETURN
-      END IF
-
-      !Set node clustering type
-      Init%InData_ExtInfw%NodeClusterType = ExternInitData%NodeClusterType
-         ! set up the data structures for integration with ExternalInflow
-      CALL Init_ExtInfw( Init%InData_ExtInfw, p_FAST, AirDens, AD%Input(1), Init%OutData_AD, AD%y, ExtInfw, Init%OutData_ExtInfw, ErrStat2, ErrMsg2 )
-         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-
-      IF (ErrStat >= AbortErrLev) THEN
-         CALL Cleanup()
-         RETURN
-      END IF
-
-      !bjj: fix me!!! to do
-      Init%OutData_IfW%WindFileInfo%MWS = 0.0_ReKi
-
-      ! Set pointer to flowfield
-      IF (p_FAST%CompAero == Module_AD) AD%p%FlowField => Init%OutData_ExtInfw%FlowField
-
+      ! ExtInfw requires initialization of AD first, so nothing executed here
    ELSE
       Init%OutData_IfW%WindFileInfo%MWS = 0.0_ReKi
    END IF   ! CompInflow
@@ -838,6 +766,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
          RETURN
       END IF
 
+      ! AeroDyn may override the AirDens value.  Store this to inform other modules
       AirDens = Init%OutData_AD%rotors(1)%AirDens
 
    ELSEIF ( p_FAST%CompAero == Module_ADsk ) THEN
@@ -867,6 +796,9 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
       CALL SetModuleSubstepTime(Module_ADsk, p_FAST, y_FAST, ErrStat2, ErrMsg2)
          CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
 
+      ! AeroDisk may override the AirDens value.  Store this to inform other modules
+      AirDens = Init%OutData_ADsk%AirDens
+
    END IF ! CompAero
 
    IF ( p_FAST%CompAero == Module_ExtLd ) THEN
@@ -887,6 +819,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
             RETURN
          END IF
 
+         ! ExtLd may override the AirDens value.  Store this to inform other modules
          AirDens = Init%OutData_ExtLd%AirDens
 
       END IF
@@ -896,11 +829,61 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
    ! ........................
    ! No aero of any sort
    ! ........................
-   IF ( (p_FAST%CompAero /= Module_AD) .and. (p_FAST%CompAero /= Module_ExtLd) ) THEN
-   ELSE
+   IF ( (p_FAST%CompAero == Module_None) .or. (p_FAST%CompAero == Module_Unknown)) THEN
       AirDens = 0.0_ReKi
    ENDIF
 
+
+   ! ........................
+   ! initialize ExtInfw
+   !     Ideally this would be initialized in the same logic as InflowWind above.  However AD outputs are required
+   ! ........................
+   IF ( p_FAST%CompInflow == Module_ExtInfw ) THEN
+
+      IF ( PRESENT(ExternInitData) ) THEN
+         Init%InData_ExtInfw%NumActForcePtsBlade = ExternInitData%NumActForcePtsBlade
+         Init%InData_ExtInfw%NumActForcePtsTower = ExternInitData%NumActForcePtsTower
+      ELSE
+         CALL SetErrStat( ErrID_Fatal, 'ExternalInflow integration can be used only with external input data (not the stand-alone executable).', ErrStat, ErrMsg, RoutineName )
+         CALL Cleanup()
+         RETURN
+      END IF
+      ! get blade and tower info from AD.  Assumption made that all blades have same spanwise characteristics
+      Init%InData_ExtInfw%BladeLength = Init%OutData_AD%rotors(1)%BladeProps(1)%BlSpn(Init%OutData_AD%rotors(1)%BladeProps(1)%NumBlNds)
+      if (allocated(Init%OutData_AD%rotors(1)%TwrElev)) then
+         Init%InData_ExtInfw%TowerHeight     = Init%OutData_AD%rotors(1)%TwrElev(SIZE(Init%OutData_AD%rotors(1)%TwrElev)) - Init%OutData_AD%rotors(1)%TwrElev(1)   ! TwrElev is based on ground or MSL.  Need flexible tower length and first node
+         Init%InData_ExtInfw%TowerBaseHeight = Init%OutData_AD%rotors(1)%TwrElev(1)
+         ALLOCATE(Init%InData_ExtInfw%StructTwrHNodes( SIZE(Init%OutData_AD%rotors(1)%TwrElev)),  STAT=ErrStat2)
+         Init%InData_ExtInfw%StructTwrHNodes(:) = Init%OutData_AD%rotors(1)%TwrElev(:)
+      else
+         Init%InData_ExtInfw%TowerHeight     = 0.0_ReKi
+         Init%InData_ExtInfw%TowerBaseHeight = 0.0_ReKi
+      endif
+      ALLOCATE(Init%InData_ExtInfw%StructBldRNodes(Init%OutData_AD%rotors(1)%BladeProps(1)%NumBlNds),  STAT=ErrStat2)
+      Init%InData_ExtInfw%StructBldRNodes(:) = Init%OutData_AD%rotors(1)%BladeProps(1)%BlSpn(:)
+      IF (ErrStat2 /= 0) THEN
+         CALL SetErrStat(ErrID_Fatal,"Error allocating ExtInfw%InitInput.",ErrStat,ErrMsg,RoutineName)
+         CALL Cleanup()
+         RETURN
+      END IF
+
+      !Set node clustering type
+      Init%InData_ExtInfw%NodeClusterType = ExternInitData%NodeClusterType
+         ! set up the data structures for integration with ExternalInflow
+      CALL Init_ExtInfw( Init%InData_ExtInfw, p_FAST, AirDens, AD%Input(1), Init%OutData_AD, AD%y, ExtInfw, Init%OutData_ExtInfw, ErrStat2, ErrMsg2 )
+         CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+
+      IF (ErrStat >= AbortErrLev) THEN
+         CALL Cleanup()
+         RETURN
+      END IF
+
+      !bjj: fix me!!! to do
+      Init%OutData_IfW%WindFileInfo%MWS = 0.0_ReKi
+
+      ! Set pointer to flowfield -- I would prefer that we did this through the AD_Init, but AD_InitOut results are required for ExtInfw_Init
+      IF (p_FAST%CompAero == Module_AD) AD%p%FlowField => Init%OutData_ExtInfw%FlowField
+   endif
 
 
    ! ........................
@@ -952,6 +935,7 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
       Init%InData_HD%OutRootName   = TRIM(p_FAST%OutFileRoot)//'.'//TRIM(y_FAST%Module_Abrev(Module_HD))
       Init%InData_HD%TMax          = p_FAST%TMax
       Init%InData_HD%Linearize     = p_FAST%Linearize
+      Init%InData_HD%PlatformPos   = Init%OutData_ED%PlatformPos ! Initial platform position; PlatformPos(1:3) is effectively the initial position of the HD origin
       if (p_FAST%WrVTK /= VTK_None) Init%InData_HD%VisMeshes=.true.
       
       ! if ( p_FAST%CompSeaSt == Module_SeaSt ) then  ! this is always true
@@ -1572,6 +1556,34 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
          Init%InData_SrvD%NumCtrl2SC = 0
       END IF
 
+      IF ( p_FAST%CompInflow == Module_IfW ) THEN !assign the number of gates to ServD
+         if (allocated(IfW%y%lidar%LidSpeed)) then    ! make sure we have the array allocated before setting it
+            CALL AllocAry(Init%InData_SrvD%LidSpeed, size(IfW%y%lidar%LidSpeed), 'Init%InData_SrvD%LidSpeed',     errStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            Init%InData_SrvD%LidSpeed = IfW%y%lidar%LidSpeed
+         endif
+         if (allocated(IfW%y%lidar%MsrPositionsX)) then    ! make sure we have the array allocated before setting it
+            CALL AllocAry(Init%InData_SrvD%MsrPositionsX, size(IfW%y%lidar%MsrPositionsX), 'Init%InData_SrvD%MsrPositionsX',     errStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            Init%InData_SrvD%MsrPositionsX = IfW%y%lidar%MsrPositionsX
+         endif
+         if (allocated(IfW%y%lidar%MsrPositionsY)) then    ! make sure we have the array allocated before setting it
+            CALL AllocAry(Init%InData_SrvD%MsrPositionsY, size(IfW%y%lidar%MsrPositionsY), 'Init%InData_SrvD%MsrPositionsY',     errStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            Init%InData_SrvD%MsrPositionsY = IfW%y%lidar%MsrPositionsY
+         endif
+         if (allocated(IfW%y%lidar%MsrPositionsZ)) then    ! make sure we have the array allocated before setting it
+            CALL AllocAry(Init%InData_SrvD%MsrPositionsZ, size(IfW%y%lidar%MsrPositionsZ), 'Init%InData_SrvD%MsrPositionsZ',     errStat2, ErrMsg2)
+            CALL SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+            Init%InData_SrvD%MsrPositionsZ = IfW%y%lidar%MsrPositionsZ
+         endif
+         Init%InData_SrvD%SensorType    = IfW%p%lidar%SensorType
+         Init%InData_SrvD%NumBeam       = IfW%p%lidar%NumBeam
+         Init%InData_SrvD%NumPulseGate  = IfW%p%lidar%NumPulseGate
+         Init%InData_SrvD%PulseSpacing  = IfW%p%lidar%PulseSpacing
+      END IF
+
+      
       ! Set cable controls inputs (if requested by other modules)  -- There is probably a nicer way to do this, but this will work for now.
       call SetSrvDCableControls()
 
@@ -1656,42 +1668,6 @@ SUBROUTINE FAST_InitializeAll( t_initial, p_FAST, y_FAST, m_FAST, ED, SED, BD, S
          ErrStat = ErrID_None
          ErrMsg = ""
       END IF
-
-   ! ----------------------------------------------------------------------------
-   ! Initialize low-pass-filtered displacements of HydroDyn potential-flow bodies
-   ! ----------------------------------------------------------------------------
-   IF ( (p_FAST%CompHydro == Module_HD) .AND. (HD%p%PotMod == 1_IntKi) ) THEN
-      IF ( HD%p%WAMIT(1)%ExctnDisp == 2_IntKi ) THEN
-         ! Set the initial displacement of ED%PlatformPtMesh here to use MeshMapping
-         ED%y%PlatformPtMesh%TranslationDisp(:,1) = Init%OutData_ED%PlatformPos(1:3)
-         CALL SmllRotTrans( 'initial platform rotation ', &
-                             REAL(Init%OutData_ED%PlatformPos(4),R8Ki), &
-                             REAL(Init%OutData_ED%PlatformPos(5),R8Ki), &
-                             REAL(Init%OutData_ED%PlatformPos(6),R8Ki), &
-                             ED%y%PlatformPtMesh%Orientation(:,:,1), '', ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         ED%y%PlatformPtMesh%TranslationDisp(1,1) = ED%y%PlatformPtMesh%TranslationDisp(1,1) + ED%y%PlatformPtMesh%Orientation(3,1,1) * ED%p%PtfmRefzt
-         ED%y%PlatformPtMesh%TranslationDisp(2,1) = ED%y%PlatformPtMesh%TranslationDisp(2,1) + ED%y%PlatformPtMesh%Orientation(3,2,1) * ED%p%PtfmRefzt
-         ED%y%PlatformPtMesh%TranslationDisp(3,1) = ED%y%PlatformPtMesh%TranslationDisp(3,1) + ED%y%PlatformPtMesh%Orientation(3,3,1) * ED%p%PtfmRefzt - ED%p%PtfmRefzt
-         CALL Transfer_PlatformMotion_to_HD( ED%y%PlatformPtMesh, HD%Input(1), MeshMapData, ErrStat2, ErrMsg2 )
-         CALL SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
-         IF (ErrStat >= AbortErrLev) THEN
-            CALL Cleanup()
-            RETURN
-         END IF
-         IF (HD%p%NBodyMod .EQ. 1_IntKi) THEN ! One instance of WAMIT with NBody
-            DO i = 1,HD%p%NBody
-               HD%xd(STATE_CURR)%WAMIT(1)%BdyPosFilt(1,i,:) = HD%Input(1)%WAMITMesh%TranslationDisp(1,i)
-               HD%xd(STATE_CURR)%WAMIT(1)%BdyPosFilt(2,i,:) = HD%Input(1)%WAMITMesh%TranslationDisp(2,i)
-            END DO
-         ELSE IF (HD%p%NBodyMod > 1_IntKi) THEN ! NBody instances of WAMIT with one body each
-            DO i = 1,HD%p%NBody
-               HD%xd(STATE_CURR)%WAMIT(i)%BdyPosFilt(1,1,:) = HD%Input(1)%WAMITMesh%TranslationDisp(1,i)
-               HD%xd(STATE_CURR)%WAMIT(i)%BdyPosFilt(2,1,:) = HD%Input(1)%WAMITMesh%TranslationDisp(2,i)
-            END DO
-         END IF
-      END IF
-   END IF
 
    ! -------------------------------------------------------------------------
    ! Initialize for linearization or computing aero maps:
@@ -2265,13 +2241,13 @@ SUBROUTINE ValidateInputData(p, m_FAST, ErrStat, ErrMsg)
    ! No method at the moment for getting disk average velocity from ExtInfw
    if (p%CompAero == Module_ADsk .and. p%CompInflow == MODULE_ExtInfw) call SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used with ExtInflow or the library interface', ErrStat, ErrMsg, RoutineName ) 
 
-   if ((p%CompAero == Module_ExtLd) .and. (p%CompInflow /= Module_NONE) ) call SetErrStat(ErrID_Fatal, 'Inflow module cannot be used when ExtLoads is used. Change CompAero or CompInflow in the OpenFAST input file.', ErrStat, ErrMsg, RoutineName)
+   if ((p%CompAero == Module_ExtLd) .and. (p%CompInflow /= Module_IfW) ) call SetErrStat(ErrID_Fatal, 'Inflow module must be used when ExtLoads is used. Change CompAero or CompInflow in the OpenFAST input file.', ErrStat, ErrMsg, RoutineName)
 
    IF (p%CompAero == Module_ADsk .and. p%MHK /= MHK_None) CALL SetErrStat( ErrID_Fatal, 'AeroDisk cannot be used with an MHK turbine. Change CompAero or MHK in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
    IF (p%MHK /= MHK_None .and. p%MHK /= MHK_FixedBottom .and. p%MHK /= MHK_Floating) CALL SetErrStat( ErrID_Fatal, 'MHK switch is invalid. Set MHK to 0, 1, or 2 in the FAST input file.', ErrStat, ErrMsg, RoutineName )
 
-   IF (p%MHK /= MHK_None .and. p%Linearize) CALL SetErrStat( ErrID_Fatal, 'Linearization has not yet been implemented for an MHK turbine. Change MHK or Linearize in the FAST input file.', ErrStat, ErrMsg, RoutineName )
+   IF (p%MHK /= MHK_None .and. p%Linearize) CALL SetErrStat( ErrID_Warn, 'Linearization is not fully implemented for an MHK turbine (buoyancy not included in perturbations, and added mass not included anywhere).', ErrStat, ErrMsg, RoutineName )
 
    IF (p%Gravity < 0.0_ReKi) CALL SetErrStat( ErrID_Fatal, 'Gravity must not be negative.', ErrStat, ErrMsg, RoutineName )
 
@@ -4736,18 +4712,14 @@ SUBROUTINE ExtLd_SetInitInput(InitInData_ExtLd, InitOutData_ED, y_ED, InitOutDat
 
    end if
 
-   InitInData_ExtLd%HubPos             = y_ED%HubPtMotion%Position(:,1)
-   InitInData_ExtLd%HubOrient          = y_ED%HubPtMotion%RefOrientation(:,:,1)
+   InitInData_ExtLd%HubPos         = y_ED%HubPtMotion%Position(:,1)
+   InitInData_ExtLd%HubOrient      = y_ED%HubPtMotion%RefOrientation(:,:,1)
 
-   InitInData_ExtLd%NacellePos         = y_ED%NacelleMotion%Position(:,1)
-   InitInData_ExtLd%NacelleOrient      = y_ED%NacelleMotion%RefOrientation(:,:,1)
+   InitInData_ExtLd%NacellePos     = y_ED%NacelleMotion%Position(:,1)
+   InitInData_ExtLd%NacelleOrient  = y_ED%NacelleMotion%RefOrientation(:,:,1)
 
-   InitInData_ExtLd%az_blend_mean = ExternInitData%az_blend_mean
+   InitInData_ExtLd%az_blend_mean  = ExternInitData%az_blend_mean
    InitInData_ExtLd%az_blend_delta = ExternInitData%az_blend_delta
-   InitInData_ExtLd%vel_mean = ExternInitData%vel_mean
-   InitInData_ExtLd%wind_dir = ExternInitData%wind_dir
-   InitInData_ExtLd%z_ref = ExternInitData%z_ref
-   InitInData_ExtLd%shear_exp = ExternInitData%shear_exp
 
    !Interpolate chord from AeroDyn to nodes of the ExtLoads module
    IF (.NOT. ALLOCATED( InitInData_ExtLd%BldChord) ) THEN

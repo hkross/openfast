@@ -164,7 +164,7 @@ SUBROUTINE WAMIT_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, ErrS
       REAL(ReKi), ALLOCATABLE                :: WAMITPer  (:)                        ! Period         components as ordered in the WAMIT output files (sec    )
       REAL(ReKi), ALLOCATABLE                :: WAMITWvDir(:)                        ! Wave direction components as ordered in the WAMIT output files (degrees)
 
-      INTEGER                                :: I,iGrid,iX,iY,iHdg                   ! Generic index
+      INTEGER                                :: I,iGrid,iX,iY,iHdg,iBdy,iStp         ! Generic index
       INTEGER                                :: InsertInd                            ! The lowest sorted index whose associated frequency component is higher than the current frequency component -- this is to sort the frequency components from lowest to highest
       INTEGER                                :: J                                    ! Generic index
       INTEGER                                :: K                                    ! Generic index
@@ -190,6 +190,7 @@ SUBROUTINE WAMIT_Init( InitInp, u, p, x, xd, z, OtherState, y, m, Interval, ErrS
       TYPE(FFT_DataType)                     :: FFT_Data                             ! the instance of the FFT module we're using
       integer(IntKi)                         :: iSub, jSub                           ! indices into the 6x6 sub-matrices used to redimensionalize the WAMIT data (Needed because NBodyMod=1 could have WAMIT matrices which are 6N x 6N)
       integer(IntKi)                         :: iBody                                ! WAMIT body index
+      real(ReKi)                             :: BdyPos0(3)                           ! Initial translational displacement of the WAMIT body
       real(R8Ki)                             :: orientation(3,3)                     ! Initial orientation of the WAMIT body 
       real(R8Ki)                             :: theta(3)                             ! Euler angle rotations of the WAMIT body
       real(ReKi)                             :: WaveNmbr                             ! Frequency-dependent wave number
@@ -1025,7 +1026,7 @@ end if
                   END DO
                ELSE IF ( InitInp%PtfmYMod == 1 ) THEN
                   IF ( (.not. EqualRealNos( HdroWvDir(1),REAL(-180,SiKi))) .OR. (.not. EqualRealNos( HdroWvDir(NInpWvDir),REAL(180,SiKi))) )  THEN
-                     ErrMsg2  = 'With PtfmYMod=1 in ElastoDyn or HydroDyn driver, we need the lowest and highest wave headings to be exactly -180 deg and 180 deg, respectively, in "' &
+                     ErrMsg2  = 'With PtfmYMod=1, we need the lowest and highest wave headings to be exactly -180 deg and 180 deg, respectively, in "' &
                                     //TRIM(InitInp%WAMITFile)//'.3" (inclusive).'
                      CALL SetErrStat( ErrID_Fatal, ErrMsg2, ErrStat, ErrMsg, RoutineName)
                      CALL Cleanup()
@@ -1188,10 +1189,12 @@ end if
                      PRPHdg = -PI + (iHdg-1) * TwoPi/REAL(p%NExctnHdg,ReKi)
                   END IF
                   DO J = 0,p%WaveField%NStepWave
-                     call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,1:3),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-                     p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,1:3) = tmpVec3
-                     call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,4:6),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-                     p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,4:6) = tmpVec3
+                     DO iBdy = 1,p%NBody
+                        call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,(6*(iBdy-1)+1):(6*(iBdy-1)+3)),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+                        p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,(6*(iBdy-1)+1):(6*(iBdy-1)+3)) = tmpVec3
+                        call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,(6*(iBdy-1)+4):(6*(iBdy-1)+6)),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+                        p%WaveExctnGrid(J,1_IntKi,1_IntKi,iHdg,(6*(iBdy-1)+4):(6*(iBdy-1)+6)) = tmpVec3
+                     END DO
                   END DO
                END DO
             else  ! p%ExctnDisp > 0
@@ -1275,10 +1278,12 @@ end if
                      iX = mod(iGrid-1, p%ExctnGridParams%n(2)) + 1  ! 1st n index is time
                      iY = (iGrid-1) / p%ExctnGridParams%n(2) + 1
                      DO J = 0,p%WaveField%NStepWave
-                        call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,iX,iY,iHdg,1:3),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-                        p%WaveExctnGrid(J,iX,iY,iHdg,1:3) = tmpVec3
-                        call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,iX,iY,iHdg,4:6),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-                        p%WaveExctnGrid(J,iX,iY,iHdg,4:6) = tmpVec3
+                        DO iBdy = 1,p%NBody
+                           call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,iX,iY,iHdg,(6*(iBdy-1)+1):(6*(iBdy-1)+3)),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+                           p%WaveExctnGrid(J,iX,iY,iHdg,(6*(iBdy-1)+1):(6*(iBdy-1)+3)) = tmpVec3
+                           call hiFrameTransform(h2i,PRPHdg,p%WaveExctnGrid(J,iX,iY,iHdg,(6*(iBdy-1)+4):(6*(iBdy-1)+6)),tmpVec3,ErrStat2,ErrMsg2);  call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
+                           p%WaveExctnGrid(J,iX,iY,iHdg,(6*(iBdy-1)+4):(6*(iBdy-1)+6)) = tmpVec3
+                        END DO
                      END DO
                   END DO
                END DO
@@ -1367,7 +1372,7 @@ end if
                   end if   
             end if
             
-            IF ( (p%ExctnMod>0) .AND. (p%ExctnDisp==2) ) THEN ! Allocate array for filtered potential-flow body positions
+            IF ( (p%ExctnMod>0) .AND. (p%ExctnDisp==2) ) THEN ! Allocate and initialize array for filtered potential-flow body positions
                p%ExctnFiltConst = exp(-2.0*Pi*p%ExctnCutOff * Interval)
                ALLOCATE ( xd%BdyPosFilt(1:2, 1:p%NBody, 1:3) , STAT=ErrStat2 )
                IF ( ErrStat2 /= 0 )  THEN
@@ -1375,7 +1380,16 @@ end if
                   CALL Cleanup()
                   RETURN            
                END IF
-               xd%BdyPosFilt = 0.0_ReKi
+               orientation  = EulerConstructZYX(InitInp%PlatformPos(4:6));
+               DO iBdy = 1,p%NBody
+                  ! Initial WAMIT body position
+                  BdyPos0 = InitInp%PlatformPos(1:3) &
+                            + matmul((/InitInp%PtfmRefxt(iBdy),InitInp%PtfmRefyt(iBdy),InitInp%PtfmRefzt(iBdy)/),orientation) &
+                            - (/InitInp%PtfmRefxt(iBdy),InitInp%PtfmRefyt(iBdy),InitInp%PtfmRefzt(iBdy)/)
+                  DO iStp = 1,3
+                     xd%BdyPosFilt(1:2,iBdy,iStp) = BdyPos0(1:2)
+                  END DO
+               END DO
             END IF
 
          ENDSELECT   
@@ -1871,6 +1885,7 @@ SUBROUTINE WAMIT_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
       INTEGER(IntKi)                       :: iBody                                   ! Counter for WAMIT bodies.  If NBodyMod > 1 then NBody = 1, and hence iBody = 1
       INTEGER(IntKi)                       :: indxStart, indxEnd                      ! Starting and ending indices for the iBody_th sub vector in an NBody long vector
       REAL(ReKi)                           :: bodyPosition(3)                         ! x-y displaced location of a WAMIT body (relative to 
+      REAL(ReKi)                           :: refBodyPosition(3)
       REAL(ReKi)                           :: tmpVec3(3),tmpVec6(6)
       REAL(ReKi),      PARAMETER           :: LrgAngle = 0.261799387799149            ! Threshold for platform roll and pitch rotation (15 deg). This is consistent with the ElastoDyn check.
 
@@ -1937,6 +1952,12 @@ SUBROUTINE WAMIT_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
                   bodyPosition(2) = p%ExctnFiltConst * xd%BdyPosFilt(2,iBody,1) + (1.0_ReKi - p%ExctnFiltConst) * u%Mesh%TranslationDisp(2,iBody)
                END IF
                bodyPosition(3) = WrapToPi(u%PtfmRefY)
+
+               ! Remove baseline displacement due to non-zero yaw orientation and body offset from PRP
+               CALL hiFrameTransform(h2i,u%PtfmRefY,u%Mesh%Position(1:3,iBody), refBodyPosition, ErrStat2, ErrMsg2 )
+               bodyPosition(1) = bodyPosition(1) - (refBodyPosition(1) - u%Mesh%Position(1,iBody))
+               bodyPosition(2) = bodyPosition(2) - (refBodyPosition(2) - u%Mesh%Position(2,iBody))
+
                iStart = (iBody-1)*6+1
                ! WaveExctnGrid dimensions are: 1st: wavetime, 2nd: X, 3rd: Y, 4th: PRP yaw offset, 5th: Force component for each WAMIT Body
                m%F_Waves1(iStart:iStart+5) = WAMIT_ForceWaves_Interp( Time, bodyPosition, p%WaveExctnGrid(:,:,:,:,iStart:iStart+5), p%ExctnGridParams, m%WaveField_m, ErrStat2, ErrMsg2 )
@@ -1974,7 +1995,7 @@ SUBROUTINE WAMIT_CalcOutput( Time, u, p, x, xd, z, OtherState, y, m, ErrStat, Er
          END IF
          IF ( (ABS( WrapToPi(rotDisp(3)-u%PtfmRefY) ) > LrgAngle) .AND. FrstWarn_LrgY ) THEN
             ErrStat2 = ErrID_Severe
-            ErrMsg2  = 'Yaw angle of a potential-flow body relative to the reference yaw position (PtfmRefY) violated the small angle assumption. The solution might be inaccurate. Consider using PtfmYMod=1 and adjust PtfmYCutoff in ElastoDyn. Simulation continuing, but future warnings will be suppressed.'
+            ErrMsg2  = 'Yaw angle of a potential-flow body relative to the reference yaw position (PtfmRefY) violated the small angle assumption. The solution might be inaccurate. Consider using PtfmYMod=1 and adjust PtfmYCutoff. Simulation continuing, but future warnings will be suppressed.'
             call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName )
             FrstWarn_LrgY = .FALSE.
          END IF
