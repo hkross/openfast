@@ -4449,10 +4449,6 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, calcCrvAngle, ErrSt
                   call SetErrStat( ErrID_Fatal, 'BlCrvAng for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
                                    //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
                endif
-               if ( InputFileData%rotors(iR)%BladeProps(k)%BlTwist(j) /= 0.0_ReKi )  then
-                  call SetErrStat( ErrID_Fatal, 'BlTwist for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
-                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
-               endif
             end do
          end do
       end if
