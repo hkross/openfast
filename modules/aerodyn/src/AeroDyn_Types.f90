@@ -278,6 +278,7 @@ IMPLICIT NONE
 ! =========  RotContinuousStateType  =======
   TYPE, PUBLIC :: RotContinuousStateType
     TYPE(BEMT_ContinuousStateType)  :: BEMT      !< Continuous states from the BEMT module [-]
+    TYPE(DMST_ContinuousStateType)  :: DMST      !< Continuous states from the DMST module [-]
     TYPE(AA_ContinuousStateType)  :: AA      !< Continuous states from the AA module [-]
   END TYPE RotContinuousStateType
 ! =======================
@@ -290,6 +291,7 @@ IMPLICIT NONE
 ! =========  RotDiscreteStateType  =======
   TYPE, PUBLIC :: RotDiscreteStateType
     TYPE(BEMT_DiscreteStateType)  :: BEMT      !< Discrete states from the BEMT module [-]
+    TYPE(DMST_DiscreteStateType)  :: DMST      !< Discrete states from the DMST module [-]
     TYPE(AA_DiscreteStateType)  :: AA      !< Discrete states from the AA module [-]
   END TYPE RotDiscreteStateType
 ! =======================
@@ -349,6 +351,7 @@ IMPLICIT NONE
   TYPE, PUBLIC :: RotMiscVarType
     TYPE(BldMiscVarType) , DIMENSION(:), ALLOCATABLE  :: blds      !< MiscVars for each blade [-]
     TYPE(BEMT_MiscVarType)  :: BEMT      !< MiscVars from the BEMT module [-]
+    TYPE(DMST_MiscVarType)  :: DMST      !< MiscVars from the DMST module [-]
     TYPE(BEMT_OutputType)  :: BEMT_y      !< Outputs from the BEMT module [-]
     TYPE(BEMT_InputType) , DIMENSION(1:2)  :: BEMT_u      !< Inputs to the BEMT module [-]
     TYPE(DMST_OutputType)  :: DMST_y      !< Outputs from the DMST module [-]
@@ -2485,6 +2488,9 @@ subroutine AD_CopyRotContinuousStateType(SrcRotContinuousStateTypeData, DstRotCo
    call BEMT_CopyContState(SrcRotContinuousStateTypeData%BEMT, DstRotContinuousStateTypeData%BEMT, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call DMST_CopyContState(SrcRotContinuousStateTypeData%DMST, DstRotContinuousStateTypeData%DMST, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    call AA_CopyContState(SrcRotContinuousStateTypeData%AA, DstRotContinuousStateTypeData%AA, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -2501,6 +2507,8 @@ subroutine AD_DestroyRotContinuousStateType(RotContinuousStateTypeData, ErrStat,
    ErrMsg  = ''
    call BEMT_DestroyContState(RotContinuousStateTypeData%BEMT, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call DMST_DestroyContState(RotContinuousStateTypeData%DMST, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call AA_DestroyContState(RotContinuousStateTypeData%AA, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
@@ -2511,6 +2519,7 @@ subroutine AD_PackRotContinuousStateType(RF, Indata)
    character(*), parameter         :: RoutineName = 'AD_PackRotContinuousStateType'
    if (RF%ErrStat >= AbortErrLev) return
    call BEMT_PackContState(RF, InData%BEMT) 
+   call DMST_PackContState(RF, InData%DMST) 
    call AA_PackContState(RF, InData%AA) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -2521,6 +2530,7 @@ subroutine AD_UnPackRotContinuousStateType(RF, OutData)
    character(*), parameter            :: RoutineName = 'AD_UnPackRotContinuousStateType'
    if (RF%ErrStat /= ErrID_None) return
    call BEMT_UnpackContState(RF, OutData%BEMT) ! BEMT 
+   call DMST_UnpackContState(RF, OutData%DMST) ! DMST 
    call AA_UnpackContState(RF, OutData%AA) ! AA 
 end subroutine
 
@@ -2641,6 +2651,9 @@ subroutine AD_CopyRotDiscreteStateType(SrcRotDiscreteStateTypeData, DstRotDiscre
    call BEMT_CopyDiscState(SrcRotDiscreteStateTypeData%BEMT, DstRotDiscreteStateTypeData%BEMT, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call DMST_CopyDiscState(SrcRotDiscreteStateTypeData%DMST, DstRotDiscreteStateTypeData%DMST, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    call AA_CopyDiscState(SrcRotDiscreteStateTypeData%AA, DstRotDiscreteStateTypeData%AA, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -2657,6 +2670,8 @@ subroutine AD_DestroyRotDiscreteStateType(RotDiscreteStateTypeData, ErrStat, Err
    ErrMsg  = ''
    call BEMT_DestroyDiscState(RotDiscreteStateTypeData%BEMT, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call DMST_DestroyDiscState(RotDiscreteStateTypeData%DMST, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call AA_DestroyDiscState(RotDiscreteStateTypeData%AA, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
@@ -2667,6 +2682,7 @@ subroutine AD_PackRotDiscreteStateType(RF, Indata)
    character(*), parameter         :: RoutineName = 'AD_PackRotDiscreteStateType'
    if (RF%ErrStat >= AbortErrLev) return
    call BEMT_PackDiscState(RF, InData%BEMT) 
+   call DMST_PackDiscState(RF, InData%DMST) 
    call AA_PackDiscState(RF, InData%AA) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
@@ -2677,6 +2693,7 @@ subroutine AD_UnPackRotDiscreteStateType(RF, OutData)
    character(*), parameter            :: RoutineName = 'AD_UnPackRotDiscreteStateType'
    if (RF%ErrStat /= ErrID_None) return
    call BEMT_UnpackDiscState(RF, OutData%BEMT) ! BEMT 
+   call DMST_UnpackDiscState(RF, OutData%DMST) ! DMST 
    call AA_UnpackDiscState(RF, OutData%AA) ! AA 
 end subroutine
 
@@ -3463,6 +3480,9 @@ subroutine AD_CopyRotMiscVarType(SrcRotMiscVarTypeData, DstRotMiscVarTypeData, C
    call BEMT_CopyMisc(SrcRotMiscVarTypeData%BEMT, DstRotMiscVarTypeData%BEMT, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
+   call DMST_CopyMisc(SrcRotMiscVarTypeData%DMST, DstRotMiscVarTypeData%DMST, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
    call BEMT_CopyOutput(SrcRotMiscVarTypeData%BEMT_y, DstRotMiscVarTypeData%BEMT_y, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
@@ -4036,6 +4056,8 @@ subroutine AD_DestroyRotMiscVarType(RotMiscVarTypeData, ErrStat, ErrMsg)
    end if
    call BEMT_DestroyMisc(RotMiscVarTypeData%BEMT, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call DMST_DestroyMisc(RotMiscVarTypeData%DMST, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    call BEMT_DestroyOutput(RotMiscVarTypeData%BEMT_y, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    LB(1:1) = lbound(RotMiscVarTypeData%BEMT_u, kind=B8Ki)
@@ -4238,6 +4260,7 @@ subroutine AD_PackRotMiscVarType(RF, Indata)
       end do
    end if
    call BEMT_PackMisc(RF, InData%BEMT) 
+   call DMST_PackMisc(RF, InData%DMST) 
    call BEMT_PackOutput(RF, InData%BEMT_y) 
    LB(1:1) = lbound(InData%BEMT_u, kind=B8Ki)
    UB(1:1) = ubound(InData%BEMT_u, kind=B8Ki)
@@ -4386,6 +4409,7 @@ subroutine AD_UnPackRotMiscVarType(RF, OutData)
       end do
    end if
    call BEMT_UnpackMisc(RF, OutData%BEMT) ! BEMT 
+   call DMST_UnpackMisc(RF, OutData%DMST) ! DMST 
    call BEMT_UnpackOutput(RF, OutData%BEMT_y) ! BEMT_y 
    LB(1:1) = lbound(OutData%BEMT_u, kind=B8Ki)
    UB(1:1) = ubound(OutData%BEMT_u, kind=B8Ki)

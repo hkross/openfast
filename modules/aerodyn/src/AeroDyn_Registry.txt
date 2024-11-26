@@ -258,6 +258,7 @@ typedef  ^  AD_InputFile   RotInputFile  rotors {:} - - "Rotor (blades and tower
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
 typedef	^	RotContinuousStateType	BEMT_ContinuousStateType	BEMT	-	-	-	"Continuous states from the BEMT module"	-
+typedef	^	RotContinuousStateType	DMST_ContinuousStateType	DMST	-	-	-	"Continuous states from the DMST module"	-
 typedef	^	RotContinuousStateType	AA_ContinuousStateType	AA	-	-	-	"Continuous states from the AA module"	-
 
 typedef	^	ContinuousStateType	RotContinuousStateType	rotors	{:}	-	-	"Continuous states for each rotor"	-
@@ -266,6 +267,7 @@ typedef	^	ContinuousStateType	FVW_ContinuousStateType	FVW	-	-	-	"Continuous stat
 
 # Define discrete (nondifferentiable) states here:
 typedef	^	RotDiscreteStateType	BEMT_DiscreteStateType	BEMT	-	-	-	"Discrete states from the BEMT module"	-
+typedef	^	RotDiscreteStateType	DMST_DiscreteStateType	DMST	-	-	-	"Discrete states from the DMST module"	-
 typedef	^	RotDiscreteStateType	AA_DiscreteStateType	AA	-	-	-	"Discrete states from the AA module"	-
 
 typedef	^	DiscreteStateType	RotDiscreteStateType	rotors	{:}	-	-	"Discrete states for each rotor"	-
@@ -308,6 +310,7 @@ typedef ^   BldMiscVarType  ReKi            BN_Cy         {:}      -  -  "tangen
 
 typedef	^	RotMiscVarType	BldMiscVarType  blds   {:}  -   -   "MiscVars for each blade"	-
 typedef	^	RotMiscVarType	BEMT_MiscVarType	BEMT	-	-	-	"MiscVars from the BEMT module"	-
+typedef	^	RotMiscVarType	DMST_MiscVarType	DMST	-	-	-	"MiscVars from the DMST module"	-
 typedef	^	RotMiscVarType	BEMT_OutputType	BEMT_y	-	-	-	"Outputs from the BEMT module"	-
 typedef	^	RotMiscVarType	BEMT_InputType	BEMT_u	2	-	-	"Inputs to the BEMT module"	-
 typedef	^	RotMiscVarType	DMST_OutputType	DMST_y	-	-	-	"Outputs from the DMST module"	-

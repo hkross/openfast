@@ -32,6 +32,7 @@
 MODULE DMST_Types
 !---------------------------------------------------------------------------------------------------------------------------------
 USE AirfoilInfo_Types
+USE UnsteadyAero_Types
 USE NWTC_Library
 IMPLICIT NONE
 ! =========  DMST_InitInputType  =======
@@ -46,6 +47,10 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: Nst = 0_IntKi      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes = 0.0_ReKi      !< Resolution of induction factor initial guess array [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: radius      !< Rotor radius [m]
+    LOGICAL  :: UA_Flag = .false.      !< Logical flag indicating whether to use UnsteadyAero [-]
+    TYPE(UA_InitInputType)  :: UA_Init      !< InitInput data for UA model [-]
+    CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: rLocal      !< Radial distance to blade node from the center of rotation, measured in the rotor plane, needed for UA [m]
   END TYPE DMST_InitInputType
 ! =======================
 ! =========  DMST_InitOutputType  =======
@@ -53,13 +58,31 @@ IMPLICIT NONE
     TYPE(ProgDesc)  :: Version      !<  [-]
   END TYPE DMST_InitOutputType
 ! =======================
+! =========  DMST_ContinuousStateType  =======
+  TYPE, PUBLIC :: DMST_ContinuousStateType
+    TYPE(UA_ContinuousStateType)  :: UA      !< UA module continuous states [-]
+  END TYPE DMST_ContinuousStateType
+! =======================
+! =========  DMST_DiscreteStateType  =======
+  TYPE, PUBLIC :: DMST_DiscreteStateType
+    TYPE(UA_DiscreteStateType)  :: UA      !< UA module discrete states [-]
+  END TYPE DMST_DiscreteStateType
+! =======================
 ! =========  DMST_OtherStateType  =======
   TYPE, PUBLIC :: DMST_OtherStateType
-    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Stored blade structural velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Stored blade structural velocity, airfoil coordinates [m/s]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Stored blade orientation matrix [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Stored blade azimuth [rad]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: indf      !< Stored induction factor [-]
+    TYPE(UA_OtherStateType)  :: UA      !< Other states for UnsteadyAero [-]
   END TYPE DMST_OtherStateType
+! =======================
+! =========  DMST_MiscVarType  =======
+  TYPE, PUBLIC :: DMST_MiscVarType
+    TYPE(UA_MiscVarType)  :: UA      !< Misc vars for UnsteadyAero [-]
+    TYPE(UA_OutputType)  :: y_UA      !< Outputs from UnsteadyAero [-]
+    TYPE(UA_InputType) , DIMENSION(:,:,:), ALLOCATABLE  :: u_UA      !< Inputs to UnsteadyAero at t and t+dt [-]
+  END TYPE DMST_MiscVarType
 ! =======================
 ! =========  DMST_ParameterType  =======
   TYPE, PUBLIC :: DMST_ParameterType
@@ -77,14 +100,19 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dTheta      !< Total streamtube angle [rad]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: theta_st      !< Azimuthal position of streamtube midpoint [rad]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: indf      !< Induction factor initial guess array [-]
+    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: CTmo      !< Thrust coefficient from linear momentum theory [-]
+    LOGICAL  :: UA_Flag = .false.      !< Logical flag indicating whether to use UnsteadyAero [-]
+    TYPE(UA_ParameterType)  :: UA      !< Parameters for UnsteadyAero [-]
   END TYPE DMST_ParameterType
 ! =======================
 ! =========  DMST_InputType  =======
   TYPE, PUBLIC :: DMST_InputType
     REAL(ReKi)  :: omega = 0.0_ReKi      !< Rotor angular velocity [rad/s]
+    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: omega_z      !< Blade pitch velocity [rad/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vinf      !< Free-stream velocity [m/s]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Streamtube angle of each blade node in upstream and downstream sweeps [rad]
-    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Structural velocity [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Blade structural velocity, airfoil coordinates [m/s]
+    REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr_g      !< Blade structural velocity, global coordinates [m/s]
     REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Orientation matrix [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAndTwist      !< Local pitch + twist angle [rad]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_st      !< Streamtube corresponding to each blade node [-]
@@ -107,6 +135,7 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    character(*),    intent(  out) :: ErrMsg
    integer(B8Ki)                  :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyInitInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -153,12 +182,31 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
       end if
       DstInitInputData%radius = SrcInitInputData%radius
    end if
+   DstInitInputData%UA_Flag = SrcInitInputData%UA_Flag
+   call UA_CopyInitInput(SrcInitInputData%UA_Init, DstInitInputData%UA_Init, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   DstInitInputData%RootName = SrcInitInputData%RootName
+   if (allocated(SrcInitInputData%rLocal)) then
+      LB(1:2) = lbound(SrcInitInputData%rLocal, kind=B8Ki)
+      UB(1:2) = ubound(SrcInitInputData%rLocal, kind=B8Ki)
+      if (.not. allocated(DstInitInputData%rLocal)) then
+         allocate(DstInitInputData%rLocal(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitInputData%rLocal.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInitInputData%rLocal = SrcInitInputData%rLocal
+   end if
 end subroutine
 
 subroutine DMST_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
    type(DMST_InitInputType), intent(inout) :: InitInputData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_DestroyInitInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -170,6 +218,11 @@ subroutine DMST_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
    end if
    if (allocated(InitInputData%radius)) then
       deallocate(InitInputData%radius)
+   end if
+   call UA_DestroyInitInput(InitInputData%UA_Init, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(InitInputData%rLocal)) then
+      deallocate(InitInputData%rLocal)
    end if
 end subroutine
 
@@ -188,6 +241,10 @@ subroutine DMST_PackInitInput(RF, Indata)
    call RegPack(RF, InData%Nst)
    call RegPack(RF, InData%DMSTRes)
    call RegPackAlloc(RF, InData%radius)
+   call RegPack(RF, InData%UA_Flag)
+   call UA_PackInitInput(RF, InData%UA_Init) 
+   call RegPack(RF, InData%RootName)
+   call RegPackAlloc(RF, InData%rLocal)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -209,6 +266,10 @@ subroutine DMST_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%Nst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DMSTRes); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%radius); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%UA_Flag); if (RegCheckErr(RF, RoutineName)) return
+   call UA_UnpackInitInput(RF, OutData%UA_Init) ! UA_Init 
+   call RegUnpack(RF, OutData%RootName); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%rLocal); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine DMST_CopyInitOutput(SrcInitOutputData, DstInitOutputData, CtrlCode, ErrStat, ErrMsg)
@@ -257,6 +318,98 @@ subroutine DMST_UnPackInitOutput(RF, OutData)
    call NWTC_Library_UnpackProgDesc(RF, OutData%Version) ! Version 
 end subroutine
 
+subroutine DMST_CopyContState(SrcContStateData, DstContStateData, CtrlCode, ErrStat, ErrMsg)
+   type(DMST_ContinuousStateType), intent(in) :: SrcContStateData
+   type(DMST_ContinuousStateType), intent(inout) :: DstContStateData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_CopyContState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_CopyContState(SrcContStateData%UA, DstContStateData%UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+end subroutine
+
+subroutine DMST_DestroyContState(ContStateData, ErrStat, ErrMsg)
+   type(DMST_ContinuousStateType), intent(inout) :: ContStateData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_DestroyContState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_DestroyContState(ContStateData%UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+end subroutine
+
+subroutine DMST_PackContState(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(DMST_ContinuousStateType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'DMST_PackContState'
+   if (RF%ErrStat >= AbortErrLev) return
+   call UA_PackContState(RF, InData%UA) 
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine DMST_UnPackContState(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(DMST_ContinuousStateType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'DMST_UnPackContState'
+   if (RF%ErrStat /= ErrID_None) return
+   call UA_UnpackContState(RF, OutData%UA) ! UA 
+end subroutine
+
+subroutine DMST_CopyDiscState(SrcDiscStateData, DstDiscStateData, CtrlCode, ErrStat, ErrMsg)
+   type(DMST_DiscreteStateType), intent(in) :: SrcDiscStateData
+   type(DMST_DiscreteStateType), intent(inout) :: DstDiscStateData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_CopyDiscState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_CopyDiscState(SrcDiscStateData%UA, DstDiscStateData%UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+end subroutine
+
+subroutine DMST_DestroyDiscState(DiscStateData, ErrStat, ErrMsg)
+   type(DMST_DiscreteStateType), intent(inout) :: DiscStateData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_DestroyDiscState'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_DestroyDiscState(DiscStateData%UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+end subroutine
+
+subroutine DMST_PackDiscState(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(DMST_DiscreteStateType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'DMST_PackDiscState'
+   if (RF%ErrStat >= AbortErrLev) return
+   call UA_PackDiscState(RF, InData%UA) 
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine DMST_UnPackDiscState(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(DMST_DiscreteStateType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'DMST_UnPackDiscState'
+   if (RF%ErrStat /= ErrID_None) return
+   call UA_UnpackDiscState(RF, OutData%UA) ! UA 
+end subroutine
+
 subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, ErrStat, ErrMsg)
    type(DMST_OtherStateType), intent(in) :: SrcOtherStateData
    type(DMST_OtherStateType), intent(inout) :: DstOtherStateData
@@ -265,6 +418,7 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
    character(*),    intent(  out) :: ErrMsg
    integer(B8Ki)                  :: LB(4), UB(4)
    integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -316,12 +470,17 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
       end if
       DstOtherStateData%indf = SrcOtherStateData%indf
    end if
+   call UA_CopyOtherState(SrcOtherStateData%UA, DstOtherStateData%UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine DMST_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
    type(DMST_OtherStateType), intent(inout) :: OtherStateData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_DestroyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -337,6 +496,8 @@ subroutine DMST_DestroyOtherState(OtherStateData, ErrStat, ErrMsg)
    if (allocated(OtherStateData%indf)) then
       deallocate(OtherStateData%indf)
    end if
+   call UA_DestroyOtherState(OtherStateData%UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine DMST_PackOtherState(RF, Indata)
@@ -348,6 +509,7 @@ subroutine DMST_PackOtherState(RF, Indata)
    call RegPackAlloc(RF, InData%M_ag)
    call RegPackAlloc(RF, InData%blade_theta)
    call RegPackAlloc(RF, InData%indf)
+   call UA_PackOtherState(RF, InData%UA) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -363,6 +525,133 @@ subroutine DMST_UnPackOtherState(RF, OutData)
    call RegUnpackAlloc(RF, OutData%M_ag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%blade_theta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return
+   call UA_UnpackOtherState(RF, OutData%UA) ! UA 
+end subroutine
+
+subroutine DMST_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
+   type(DMST_MiscVarType), intent(in) :: SrcMiscData
+   type(DMST_MiscVarType), intent(inout) :: DstMiscData
+   integer(IntKi),  intent(in   ) :: CtrlCode
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B8Ki)   :: i1, i2, i3
+   integer(B8Ki)                  :: LB(3), UB(3)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_CopyMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_CopyMisc(SrcMiscData%UA, DstMiscData%UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   call UA_CopyOutput(SrcMiscData%y_UA, DstMiscData%y_UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
+   if (allocated(SrcMiscData%u_UA)) then
+      LB(1:3) = lbound(SrcMiscData%u_UA, kind=B8Ki)
+      UB(1:3) = ubound(SrcMiscData%u_UA, kind=B8Ki)
+      if (.not. allocated(DstMiscData%u_UA)) then
+         allocate(DstMiscData%u_UA(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstMiscData%u_UA.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      do i3 = LB(3), UB(3)
+         do i2 = LB(2), UB(2)
+            do i1 = LB(1), UB(1)
+               call UA_CopyInput(SrcMiscData%u_UA(i1,i2,i3), DstMiscData%u_UA(i1,i2,i3), CtrlCode, ErrStat2, ErrMsg2)
+               call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+               if (ErrStat >= AbortErrLev) return
+            end do
+         end do
+      end do
+   end if
+end subroutine
+
+subroutine DMST_DestroyMisc(MiscData, ErrStat, ErrMsg)
+   type(DMST_MiscVarType), intent(inout) :: MiscData
+   integer(IntKi),  intent(  out) :: ErrStat
+   character(*),    intent(  out) :: ErrMsg
+   integer(B8Ki)   :: i1, i2, i3
+   integer(B8Ki)   :: LB(3), UB(3)
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
+   character(*), parameter        :: RoutineName = 'DMST_DestroyMisc'
+   ErrStat = ErrID_None
+   ErrMsg  = ''
+   call UA_DestroyMisc(MiscData%UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   call UA_DestroyOutput(MiscData%y_UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (allocated(MiscData%u_UA)) then
+      LB(1:3) = lbound(MiscData%u_UA, kind=B8Ki)
+      UB(1:3) = ubound(MiscData%u_UA, kind=B8Ki)
+      do i3 = LB(3), UB(3)
+         do i2 = LB(2), UB(2)
+            do i1 = LB(1), UB(1)
+               call UA_DestroyInput(MiscData%u_UA(i1,i2,i3), ErrStat2, ErrMsg2)
+               call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+            end do
+         end do
+      end do
+      deallocate(MiscData%u_UA)
+   end if
+end subroutine
+
+subroutine DMST_PackMisc(RF, Indata)
+   type(RegFile), intent(inout) :: RF
+   type(DMST_MiscVarType), intent(in) :: InData
+   character(*), parameter         :: RoutineName = 'DMST_PackMisc'
+   integer(B8Ki)   :: i1, i2, i3
+   integer(B8Ki)   :: LB(3), UB(3)
+   if (RF%ErrStat >= AbortErrLev) return
+   call UA_PackMisc(RF, InData%UA) 
+   call UA_PackOutput(RF, InData%y_UA) 
+   call RegPack(RF, allocated(InData%u_UA))
+   if (allocated(InData%u_UA)) then
+      call RegPackBounds(RF, 3, lbound(InData%u_UA, kind=B8Ki), ubound(InData%u_UA, kind=B8Ki))
+      LB(1:3) = lbound(InData%u_UA, kind=B8Ki)
+      UB(1:3) = ubound(InData%u_UA, kind=B8Ki)
+      do i3 = LB(3), UB(3)
+         do i2 = LB(2), UB(2)
+            do i1 = LB(1), UB(1)
+               call UA_PackInput(RF, InData%u_UA(i1,i2,i3)) 
+            end do
+         end do
+      end do
+   end if
+   if (RegCheckErr(RF, RoutineName)) return
+end subroutine
+
+subroutine DMST_UnPackMisc(RF, OutData)
+   type(RegFile), intent(inout)    :: RF
+   type(DMST_MiscVarType), intent(inout) :: OutData
+   character(*), parameter            :: RoutineName = 'DMST_UnPackMisc'
+   integer(B8Ki)   :: i1, i2, i3
+   integer(B8Ki)   :: LB(3), UB(3)
+   integer(IntKi)  :: stat
+   logical         :: IsAllocAssoc
+   if (RF%ErrStat /= ErrID_None) return
+   call UA_UnpackMisc(RF, OutData%UA) ! UA 
+   call UA_UnpackOutput(RF, OutData%y_UA) ! y_UA 
+   if (allocated(OutData%u_UA)) deallocate(OutData%u_UA)
+   call RegUnpack(RF, IsAllocAssoc); if (RegCheckErr(RF, RoutineName)) return
+   if (IsAllocAssoc) then
+      call RegUnpackBounds(RF, 3, LB, UB); if (RegCheckErr(RF, RoutineName)) return
+      allocate(OutData%u_UA(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)),stat=stat)
+      if (stat /= 0) then 
+         call SetErrStat(ErrID_Fatal, 'Error allocating OutData%u_UA.', RF%ErrStat, RF%ErrMsg, RoutineName)
+         return
+      end if
+      do i3 = LB(3), UB(3)
+         do i2 = LB(2), UB(2)
+            do i1 = LB(1), UB(1)
+               call UA_UnpackInput(RF, OutData%u_UA(i1,i2,i3)) ! u_UA 
+            end do
+         end do
+      end do
+   end if
 end subroutine
 
 subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
@@ -373,6 +662,7 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    character(*),    intent(  out) :: ErrMsg
    integer(B8Ki)                  :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyParam'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -456,12 +746,30 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       end if
       DstParamData%indf = SrcParamData%indf
    end if
+   if (allocated(SrcParamData%CTmo)) then
+      LB(1:1) = lbound(SrcParamData%CTmo, kind=B8Ki)
+      UB(1:1) = ubound(SrcParamData%CTmo, kind=B8Ki)
+      if (.not. allocated(DstParamData%CTmo)) then
+         allocate(DstParamData%CTmo(LB(1):UB(1)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%CTmo.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstParamData%CTmo = SrcParamData%CTmo
+   end if
+   DstParamData%UA_Flag = SrcParamData%UA_Flag
+   call UA_CopyParam(SrcParamData%UA, DstParamData%UA, CtrlCode, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
+   if (ErrStat >= AbortErrLev) return
 end subroutine
 
 subroutine DMST_DestroyParam(ParamData, ErrStat, ErrMsg)
    type(DMST_ParameterType), intent(inout) :: ParamData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
+   integer(IntKi)                 :: ErrStat2
+   character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_DestroyParam'
    ErrStat = ErrID_None
    ErrMsg  = ''
@@ -483,6 +791,11 @@ subroutine DMST_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%indf)) then
       deallocate(ParamData%indf)
    end if
+   if (allocated(ParamData%CTmo)) then
+      deallocate(ParamData%CTmo)
+   end if
+   call UA_DestroyParam(ParamData%UA, ErrStat2, ErrMsg2)
+   call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
 end subroutine
 
 subroutine DMST_PackParam(RF, Indata)
@@ -504,6 +817,9 @@ subroutine DMST_PackParam(RF, Indata)
    call RegPackAlloc(RF, InData%dTheta)
    call RegPackAlloc(RF, InData%theta_st)
    call RegPackAlloc(RF, InData%indf)
+   call RegPackAlloc(RF, InData%CTmo)
+   call RegPack(RF, InData%UA_Flag)
+   call UA_PackParam(RF, InData%UA) 
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -529,6 +845,9 @@ subroutine DMST_UnPackParam(RF, OutData)
    call RegUnpackAlloc(RF, OutData%dTheta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%theta_st); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%CTmo); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpack(RF, OutData%UA_Flag); if (RegCheckErr(RF, RoutineName)) return
+   call UA_UnpackParam(RF, OutData%UA) ! UA 
 end subroutine
 
 subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
@@ -543,6 +862,18 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    ErrStat = ErrID_None
    ErrMsg  = ''
    DstInputData%omega = SrcInputData%omega
+   if (allocated(SrcInputData%omega_z)) then
+      LB(1:2) = lbound(SrcInputData%omega_z, kind=B8Ki)
+      UB(1:2) = ubound(SrcInputData%omega_z, kind=B8Ki)
+      if (.not. allocated(DstInputData%omega_z)) then
+         allocate(DstInputData%omega_z(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%omega_z.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%omega_z = SrcInputData%omega_z
+   end if
    if (allocated(SrcInputData%Vinf)) then
       LB(1:3) = lbound(SrcInputData%Vinf, kind=B8Ki)
       UB(1:3) = ubound(SrcInputData%Vinf, kind=B8Ki)
@@ -578,6 +909,18 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
          end if
       end if
       DstInputData%Vstr = SrcInputData%Vstr
+   end if
+   if (allocated(SrcInputData%Vstr_g)) then
+      LB(1:3) = lbound(SrcInputData%Vstr_g, kind=B8Ki)
+      UB(1:3) = ubound(SrcInputData%Vstr_g, kind=B8Ki)
+      if (.not. allocated(DstInputData%Vstr_g)) then
+         allocate(DstInputData%Vstr_g(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
+         if (ErrStat2 /= 0) then
+            call SetErrStat(ErrID_Fatal, 'Error allocating DstInputData%Vstr_g.', ErrStat, ErrMsg, RoutineName)
+            return
+         end if
+      end if
+      DstInputData%Vstr_g = SrcInputData%Vstr_g
    end if
    if (allocated(SrcInputData%M_ag)) then
       LB(1:4) = lbound(SrcInputData%M_ag, kind=B8Ki)
@@ -636,6 +979,9 @@ subroutine DMST_DestroyInput(InputData, ErrStat, ErrMsg)
    character(*), parameter        :: RoutineName = 'DMST_DestroyInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
+   if (allocated(InputData%omega_z)) then
+      deallocate(InputData%omega_z)
+   end if
    if (allocated(InputData%Vinf)) then
       deallocate(InputData%Vinf)
    end if
@@ -644,6 +990,9 @@ subroutine DMST_DestroyInput(InputData, ErrStat, ErrMsg)
    end if
    if (allocated(InputData%Vstr)) then
       deallocate(InputData%Vstr)
+   end if
+   if (allocated(InputData%Vstr_g)) then
+      deallocate(InputData%Vstr_g)
    end if
    if (allocated(InputData%M_ag)) then
       deallocate(InputData%M_ag)
@@ -665,9 +1014,11 @@ subroutine DMST_PackInput(RF, Indata)
    character(*), parameter         :: RoutineName = 'DMST_PackInput'
    if (RF%ErrStat >= AbortErrLev) return
    call RegPack(RF, InData%omega)
+   call RegPackAlloc(RF, InData%omega_z)
    call RegPackAlloc(RF, InData%Vinf)
    call RegPackAlloc(RF, InData%blade_theta)
    call RegPackAlloc(RF, InData%Vstr)
+   call RegPackAlloc(RF, InData%Vstr_g)
    call RegPackAlloc(RF, InData%M_ag)
    call RegPackAlloc(RF, InData%PitchAndTwist)
    call RegPackAlloc(RF, InData%blade_st)
@@ -684,9 +1035,11 @@ subroutine DMST_UnPackInput(RF, OutData)
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
    call RegUnpack(RF, OutData%omega); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%omega_z); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Vinf); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%blade_theta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%Vstr); if (RegCheckErr(RF, RoutineName)) return
+   call RegUnpackAlloc(RF, OutData%Vstr_g); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%M_ag); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%PitchAndTwist); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%blade_st); if (RegCheckErr(RF, RoutineName)) return

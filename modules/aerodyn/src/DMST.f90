@@ -22,6 +22,8 @@ module DMST
    use NWTC_Library
    use DMST_Types
    use AirfoilInfo
+   use UnsteadyAero
+   use FVW_Subs
 
    implicit none
    
@@ -62,6 +64,7 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
 
    p%numBlades      = InitInp%numBlades   
    p%numBladeNodes  = InitInp%numBladeNodes 
+   p%UA_Flag        = InitInp%UA_Flag   
    p%airDens        = InitInp%airDens
    p%kinVisc        = InitInp%kinVisc
    p%DMSTMod        = InitInp%DMSTMod
@@ -105,6 +108,12 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
+   allocate ( p%CTmo(lgth), STAT = errStat2 )
+   if ( errStat2 /= 0 ) then
+      call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%CTmo.', errStat, errMsg, RoutineName )
+      return
+   end if 
+
    p%AFindx = InitInp%AFindx 
    p%chord = InitInp%chord
    p%radius = InitInp%radius
@@ -123,7 +132,49 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       p%indf(j) = p%DMSTRes + p%DMSTRes*(j-1)
    end do
 
+      ! Calculate the thrust coefficient from linear momentum theory
+   call calculate_CTmo( p%DMSTMod, p%indf, p%CTmo )
+
 end subroutine DMST_SetParameters
+!----------------------------------------------------------------------------------------------------------------------------------   
+subroutine DMST_Set_UA_InitData( InitInp, Interval, Init_UA_Data, ErrStat, ErrMsg )
+! This routine is called from DMST_Init.
+! The parameters are set here and not changed during the simulation.
+!..................................................................................................................................
+   type(DMST_InitInputType),       intent(inout)  :: InitInp      ! Input data for initialization routine
+   real(DbKi),                     intent(in   )  :: Interval     ! Time interval  
+   type(UA_InitInputType),         intent(inout)  :: Init_UA_Data ! Parameters
+   integer(IntKi),                 intent(  out)  :: ErrStat      ! Error status of the operation
+   character(*),                   intent(  out)  :: ErrMsg       ! Error message if ErrStat /= ErrID_None
+
+   integer                                        :: i,j
+   integer(intKi)                                 :: ErrStat2     ! Temporary error status
+   
+   allocate(Init_UA_Data%c(InitInp%numBladeNodes,InitInp%numBlades), STAT = errStat2)
+   if (ErrStat2 /= 0) then
+      ErrStat = ErrID_Fatal
+      ErrMsg = "DMST_Set_UA_InitData: Error allocating Init_UA_Data%c."
+      return
+   else
+      ErrStat = ErrID_None
+      ErrMsg = ""
+   end if
+   
+   do j = 1,InitInp%numBlades
+      do i = 1,InitInp%numBladeNodes
+         Init_UA_Data%c(i,j)    = InitInp%chord(i,j)
+      end do
+   end do
+   
+   Init_UA_Data%dt              = Interval
+   Init_UA_Data%OutRootName     = trim(InitInp%RootName)//'.UA'
+               
+   Init_UA_Data%numBlades       = InitInp%numBlades 
+   Init_UA_Data%nNodesPerBlade  = InitInp%numBladeNodes
+   
+   Init_UA_Data%ShedEffect      = .true. ! This should be true when coupled to BEM/DMST
+   
+end subroutine DMST_Set_UA_InitData
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_InitOtherStates( OtherState, p, errStat, errMsg )
 ! This routine is called from DMST_Init.
@@ -201,12 +252,26 @@ subroutine DMST_AllocInput( u, p, errStat, errMsg )
    end if 
    u%Vinf = 0.0_ReKi
 
+   allocate ( u%omega_z(p%numBladeNodes,p%numBlades), STAT = errStat2 )
+   if ( errStat2 /= 0 ) then
+      call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%omega_z.', errStat, errMsg, RoutineName )
+      return
+   end if 
+   u%omega_z = 0.0_ReKi
+
    allocate ( u%blade_theta(p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%blade_theta.', errStat, errMsg, RoutineName )
       return
    end if 
    u%blade_theta = 0.0_ReKi
+
+   allocate ( u%Vstr_g(3_IntKi,p%numBladeNodes,p%numBlades), STAT = errStat2 )
+   if ( errStat2 /= 0 ) then
+      call SetErrStat( ErrID_Fatal, 'Error allocating memory for u%Vstr_g.', errStat, errMsg, RoutineName )
+      return
+   end if 
+   u%Vstr_g = 0.0_ReKi
 
    allocate ( u%Vstr(3_IntKi,p%numBladeNodes,p%numBlades), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
@@ -265,14 +330,18 @@ subroutine DMST_AllocOutput( y, p, errStat, errMsg )
 
 end subroutine DMST_AllocOutput
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine DMST_Init( InitInp, u, p, OtherState, y, Interval, InitOut, ErrStat, ErrMsg )
+subroutine DMST_Init( InitInp, u, p, x, xd, OtherState, AFinfo, y, misc, Interval, InitOut, ErrStat, ErrMsg )
 ! This routine is called at the start of the simulation to perform initialization steps.
 ! The parameters are set here and not changed during the simulation.
 !..................................................................................................................................
-   type(DMST_InitInputType),       intent(in   )  :: InitInp     ! Input for initialization routine
+   type(DMST_InitInputType),       intent(inout)  :: InitInp     ! Input for initialization routine
    type(DMST_InputType),           intent(  out)  :: u           ! An initial guess for the input; input mesh must be defined
    type(DMST_ParameterType),       intent(  out)  :: p           ! Parameters
+   type(DMST_ContinuousStateType), intent(  out)  :: x           ! Initial continuous states
+   type(DMST_DiscreteStateType),   intent(  out)  :: xd          ! Initial discrete states
    type(DMST_OtherStateType),      intent(  out)  :: OtherState  ! Initial other states
+   type(AFI_ParameterType),        intent(in   )  :: AFInfo(:)   ! The airfoil parameter data
+   type(DMST_MiscVarType),         intent(  out)  :: misc        ! Initial misc/optimization variables
    type(DMST_OutputType),          intent(  out)  :: y           ! Initial system outputs (outputs are not calculated; only the output mesh is initialized)
    real(DbKi),                     intent(in   )  :: Interval    ! Coupling interval in seconds
    type(DMST_InitOutputType),      intent(  out)  :: InitOut     ! Output for initialization routine
@@ -283,6 +352,7 @@ subroutine DMST_Init( InitInp, u, p, OtherState, y, Interval, InitOut, ErrStat, 
    character(ErrMsgLen)                           :: errMsg2     ! Temporary error message if ErrStat /= ErrID_None
    integer(IntKi)                                 :: errStat2    ! Temporary error status of the operation
    character(*), parameter                        :: RoutineName = 'DMST_Init'
+   type(UA_InitOutputType)                        :: InitOutData_UA
 
       ! Initialize variables for this routine
    errStat = ErrID_None
@@ -301,22 +371,65 @@ subroutine DMST_Init( InitInp, u, p, OtherState, y, Interval, InitOut, ErrStat, 
    call DMST_InitOtherStates( OtherState, p, errStat, errMsg )
       if (errStat >= AbortErrLev) return
 
+      ! Initialize unsteady aero
+   allocate( misc%u_UA( p%numBladeNodes, p%numBlades, 2 ), stat=errStat2 )
+   if ( errStat2 /= 0)  then
+      call SetErrStat( ErrID_Fatal, "Error allocating u_UA", errStat, errMsg, RoutineName )
+      call cleanup()
+      return
+   end if
+
+   if ( p%UA_Flag ) then
+      call DMST_Set_UA_InitData( InitInp, Interval, InitInp%UA_Init, errStat2, errMsg2 )
+         call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+         if ( errStat >= AbortErrLev ) then
+            call cleanup()
+            return
+         end if
+      
+      call UA_Init( InitInp%UA_Init, misc%u_UA(1,1,1), p%UA, x%UA, xd%UA, OtherState%UA, misc%y_UA, misc%UA, Interval, AFInfo, p%AFIndx, InitOutData_UA, errStat2, errMsg2 )
+         call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
+         if ( errStat >= AbortErrLev ) then
+            call cleanup()
+            return
+         end if
+   else
+      p%UA%lin_nx = 0
+   end if
+
       ! Allocate all the arrays that store data in the input type
    call DMST_AllocInput( u, p, errStat2, errMsg2 )      
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      if (errStat >= AbortErrLev) return
+      if (errStat >= AbortErrLev) then
+         call cleanup()
+         return
+      end if
 
       ! Allocate all the arrays that store data in the output type
    call DMST_AllocOutput( y, p, errStat2, errMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      if (errStat >= AbortErrLev) return
+      if (errStat >= AbortErrLev) then
+         call cleanup()
+         return
+      end if
    
    InitOut%Version = DMST_Ver
 
       ! Set initial values for states
    call DMST_ReInit( p, OtherState, errStat2, errMsg2 )
       call SetErrStat( errStat2, errMsg2, errStat, errMsg, RoutineName )
-      if (errStat >= AbortErrLev) return
+      
+   call cleanup()
+
+CONTAINS
+   !...............................................................................................................................
+   subroutine cleanup()
+   ! This subroutine cleans up local variables that may have allocatable arrays
+   !...............................................................................................................................
+
+   call UA_DestroyInitOutput( InitOutData_UA, ErrStat2, ErrMsg2 )
+
+   end subroutine cleanup
 
 end subroutine DMST_Init
 !----------------------------------------------------------------------------------------------------------------------------------
@@ -386,21 +499,37 @@ end subroutine DMST_ReInit
 
 ! END SUBROUTINE BEMT_End
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine DMST_UpdateStates(p, u, y, OtherState, errStat, errMsg)
+subroutine DMST_UpdateStates(t, n, u, utimes, p, y, x, xd, OtherState, AFInfo, m, errStat, errMsg)
 !
 !..................................................................................................................................
+   real(DbKi),                          intent(in   ) :: t          ! Current simulation time in seconds
+   integer(IntKi),                      intent(in   ) :: n          ! Current simulation time step n = 0,1,...
+   type(DMST_InputType),                intent(in   ) :: u(:)       ! Inputs at t and t + dt
+   real(DbKi),                          intent(in   ) :: utimes(:)  ! Times associated with u(:), in seconds
    type(DMST_ParameterType),            intent(in   ) :: p          ! Parameters
-   type(DMST_InputType),                intent(in   ) :: u(2)       ! Inputs at t and t + dt
    type(DMST_OutputType),               intent(in   ) :: y          ! Outputs at t
+   type(DMST_ContinuousStateType),      intent(inout) :: x          ! Input: Continuous states at t; Output: at t+DTaero
+   type(DMST_DiscreteStateType),        intent(inout) :: xd         ! Input: Discrete states at t;   Output: at t+DTaero
    type(DMST_OtherStateType),           intent(inout) :: OtherState ! Input: Other states at t; Output: Other states at t + Interval
+   type(AFI_ParameterType),             intent(in   ) :: AFInfo(:)  ! The airfoil parameter data
+   type(DMST_MiscVarType),              intent(inout) :: m          ! Misc/optimization variables
    integer(IntKi),                      intent(  out) :: errStat    ! Error status of the operation
    character(*),                        intent(  out) :: errMsg     ! Error message if ErrStat /= ErrID_None
 
-   integer(IntKi)                                     :: j
-   integer(IntKi)                                     :: k
+   real(ReKi),  dimension(3_IntKi,p%numBladeNodes,p%numBlades)  :: Vind_st           ! Induced velocity, global coordinates
+   real(ReKi),  dimension(p%numBladeNodes,p%numBlades)          :: indf_final_store  ! Final stored induction factors
+   integer(IntKi)                                               :: j
+   integer(IntKi)                                               :: k
+   integer(IntKi)                                               :: indx
+   character(*), parameter                                      :: RoutineName = 'DMST_UpdateStates'
+   integer(IntKi)                                               :: ErrStat2          ! Temporary error status
+   character(ErrMsgLen)                                         :: ErrMsg2           ! Temporary error message
       
    ErrStat = ErrID_None
    ErrMsg = ""
+
+      ! Initialize some local values
+   Vind_st = 0.0
 
    do k = 1,p%numBlades
       do j = 1,p%numBladeNodes
@@ -413,14 +542,67 @@ subroutine DMST_UpdateStates(p, u, y, OtherState, errStat, errMsg)
       end do
    end do
 
+   if ( p%UA_Flag ) then
+      do indx = 1,2
+         call calculate_Inductions_from_DMST( u(indx), p, OtherState, AFInfo, Vind_st, indf_final_store )
+         call SetInputs_for_UA( u(indx), p, Vind_st, m%u_UA(:,:,indx) )
+      end do
+   
+      do k = 1,p%numBlades
+         do j = 1,p%numBladeNodes
+            call UA_UpdateStates( j, k, t, n, m%u_UA(j,k,:), utimes, p%UA, x%UA, xd%UA, OtherState%UA, AFInfo(p%AFIndx(j,k)), m%UA, errStat2, errMsg2 )
+               if (ErrStat2 /= ErrID_None) then
+                  call SetErrStat( ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName//trim(NodeText(j,k)) )
+                  if (errStat >= AbortErrLev) return
+               end if
+         end do
+      end do
+   end if
+
    !do i=1,size(u)
    !   call DMST_DestroyInput( u(i), ErrStat, ErrMsg )
    !enddo
 
+   contains 
+      function NodeText(j,k)
+         integer(IntKi), intent(in) :: j ! node number
+         integer(IntKi), intent(in) :: k ! blade number
+         character(25)              :: NodeText
+         NodeText = '(node '//trim(num2lstr(j))//', blade '//trim(num2lstr(k))//')'
+      end function NodeText
+
 end subroutine DMST_UpdateStates
 !----------------------------------------------------------------------------------------------------------------------------------
+subroutine SetInputs_for_UA( u, p, Vind_st, u_UA )
+!
+!..................................................................................................................................
+   type(DMST_ParameterType),            intent(in   ) :: p          ! Parameters
+   type(DMST_InputType),                intent(in   ) :: u          ! Inputs at indx
+   type(UA_InputType),                  intent(  out) :: u_UA(:,:)  ! Inputs for UnsteadyAero
+
+   real(ReKi),  dimension(3_IntKi,p%numBladeNodes,p%numBlades)  :: Vind_st  ! Induced velocity, global coordinates
+   real(ReKi)                                                   :: Vrel_norm
+   real(ReKi)                                                   :: alpha
+   real(ReKi)                                                   :: Re
+   integer(IntKi)                                               :: j
+   integer(IntKi)                                               :: k
+      
+   do k = 1,p%numBlades
+      do j = 1,p%numBladeNodes
+         call AlphaVrel_Generic(u%M_ag(:,:,j,k), u%Vstr_g(:,j,k), Vind_st(:,j,k), u%Vinf(:,j,k), p%kinVisc, p%chord(j,k), Vrel_norm, alpha, Re)    
+         u_UA(j,k)%U        = Vrel_norm
+         u_UA(j,k)%alpha    = alpha
+         u_UA(j,k)%Re       = Re
+         u_UA(j,k)%v_ac(1)  = sin(u_UA(j,k)%alpha)*u_UA(j,k)%U
+         u_UA(j,k)%v_ac(2)  = cos(u_UA(j,k)%alpha)*u_UA(j,k)%U
+         u_UA(j,k)%omega    = u%omega_z(j,k)
+      end do
+   end do
+
+end subroutine SetInputs_for_UA
+!----------------------------------------------------------------------------------------------------------------------------------
 subroutine calculate_CTmo( DMSTMod, indf, CTmo )
-! This routine is called from DMST_CalcOutput and calculates the thrust coefficient from linear momentum theory.
+! This routine is called from DMST_SetParameters and calculates the thrust coefficient from linear momentum theory.
 !..................................................................................................................................
    integer(IntKi),                 intent(in   )  :: DMSTMod     ! Type of momentum theory model
    real(ReKi),                     intent(in   )  :: indf(:)     ! Array of induction factors
@@ -502,7 +684,7 @@ subroutine calculate_CTbe( j, k, Vinf, blade_theta, M_ag, Vstr, p, u, AFinfo, CT
 
 end subroutine calculate_CTbe
 !----------------------------------------------------------------------------------------------------------------------------------
-subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, Nst, indf_hist, blade_st, crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
+subroutine calculate_InductionFactors( DMSTMod, indf, tol, Nst, indf_hist, blade_st, crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
    ! This routine is called from DMST_CalcOutput and calculates the final induction factor in a streamtube.
    !..................................................................................................................................
    integer(IntKi),                 intent(in   )                  :: DMSTMod              ! Type of momentum theory model
@@ -589,10 +771,10 @@ subroutine calculate_Inductions_from_DMST( DMSTMod, indf, tol, Nst, indf_hist, b
       indf_final_tmp_store = 9999.0_ReKi
    end if
 
-end subroutine calculate_Inductions_from_DMST
+end subroutine calculate_InductionFactors
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_QuadSolve_Glauert( tol, CTfinal, indf, indf_plus, indf_tmp )
-! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
+! This routine is called from calculate_InductionFactors and calculates induction factors given a thrust coefficient value.
 !..................................................................................................................................
    real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
    real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
@@ -621,7 +803,7 @@ subroutine DMST_QuadSolve_Glauert( tol, CTfinal, indf, indf_plus, indf_tmp )
 end subroutine DMST_QuadSolve_Glauert
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_QuadSolve_Theoretical( tol, CTfinal, indf, indf_plus, indf_tmp )
-! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
+! This routine is called from calculate_InductionFactors and calculates induction factors given a thrust coefficient value.
 !..................................................................................................................................
    real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
    real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
@@ -650,7 +832,7 @@ subroutine DMST_QuadSolve_Theoretical( tol, CTfinal, indf, indf_plus, indf_tmp )
 end subroutine DMST_QuadSolve_Theoretical
 !----------------------------------------------------------------------------------------------------------------------------------
 subroutine DMST_QuadSolve_HighLoad( tol, CTfinal, indf, indf_plus, indf_tmp )
-! This routine is called from calculate_Inductions_from_DMST and calculates induction factors given a thrust coefficient value.
+! This routine is called from calculate_InductionFactors and calculates induction factors given a thrust coefficient value.
 !..................................................................................................................................
    real(ReKi),                     intent(in   )  :: tol          ! Tolerance for checking induction factor values
    real(ReKi),                     intent(in   )  :: CTfinal      ! A possible final CT value
@@ -690,11 +872,38 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
    character(*),                   intent(  out)                           :: errMsg         ! Error message if ErrStat /= ErrID_None
 
       ! Local variables
+   character(*), parameter                                                 :: RoutineName = 'DMST_CalcOutput'
+   real(ReKi),   dimension(3_IntKi,p%numBladeNodes,p%numBlades)            :: Vind_st           ! Induced velocity, global coordinates
+   real(ReKi),   dimension(p%numBladeNodes,p%numBlades)                    :: indf_final_store  ! Final stored induction factors
+
+      ! Initialize some output values
+   errStat = ErrID_None
+   errMsg  = ""
+
+      ! Initialize some local values
+   Vind_st = 0.0
+
+   call calculate_Inductions_from_DMST( u, p, OtherState, AFInfo, Vind_st, indf_final_store )
+
+      ! Output induced velocity values at blade nodes
+   y%Vind = Vind_st
+   y%indf = indf_final_store
+
+end subroutine DMST_CalcOutput
+!----------------------------------------------------------------------------------------------------------------------------------
+subroutine calculate_Inductions_from_DMST( u, p, OtherState, AFInfo, Vind_st, indf_final_store )
+! This routine is called from DMST_CalcOutput and calculates the induced velocity at each blade node.
+!..................................................................................................................................
+   type(DMST_InputType),           intent(in   )                           :: u              ! Inputs at time t
+   type(DMST_ParameterType),       intent(in   )                           :: p              ! Parameters
+   type(DMST_OtherStateType),      intent(in   )                           :: OtherState     ! OtherState data
+   type(AFI_ParameterType),        intent(in   )                           :: AFInfo(:)      ! The airfoil parameter data
+   
+      ! Local variables
    real(ReKi)                                                                   :: blade_theta          ! Azimuthal location of each blade node
    real(ReKi),     dimension(3_IntKi,3_IntKi)                                   :: M_ag                 ! Blade orientation matrix
    real(ReKi),     dimension(3_IntKi)                                           :: Vstr                 ! Structural velocity, airfoil coordinates
    real(ReKi),     dimension(3_IntKi)                                           :: Vinf                 ! Inflow velocity, global coordinates
-   real(ReKi),     dimension(size(p%indf))                                      :: CTmo                 ! Thrust coefficient from linear momentum theory
    real(ReKi),     dimension(size(p%indf))                                      :: CTbe                 ! Thrust coefficient from blade element theory
    real(ReKi),     dimension(size(p%indf))                                      :: CTdiff               ! Difference between CTbe and CTmo
    integer(IntKi), dimension(size(p%indf)-1_IntKi)                              :: crossPts             ! Crossing points between CTmo and CTbe
@@ -709,20 +918,10 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
    integer(IntKi)                                                               :: j                    ! Loops through nodes
    integer(IntKi)                                                               :: k                    ! Loops through blades
    integer(IntKi)                                                               :: m                    ! Loops through sweeps
-   character(*), parameter                                                      :: RoutineName = 'DMST_CalcOutput'
-
-      ! Initialize some output values
-   errStat = ErrID_None
-   errMsg  = ""
 
       ! Initialize some local values
-   CTmo = 0.0
    indf_final_u = 1.0
    indf_final = 0.0
-   Vind_st = 0.0
-
-      ! Calculate the thrust coefficient from linear momentum theory
-   call calculate_CTmo( p%DMSTMod, p%indf, CTmo )
 
       ! Loop through upstream and downstream sweeps
    do m = 1,2
@@ -771,7 +970,7 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
 
                if ( Vstr(1) < 9999.0 ) then
                      ! Calculate difference between CTbe and CTmo
-                  CTdiff = CTbe - CTmo
+                  CTdiff = CTbe - p%CTmo
 
                      ! Locate crossing points between CTmo and CTbe
                   do i = 1,size(p%indf)-1
@@ -788,7 +987,7 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
                   end do
 
                      ! Calculate final thrust coefficients and induction factors
-                  call calculate_Inductions_from_DMST( p%DMSTMod, p%indf, p%DMSTRes, p%Nst, OtherState%indf(:,j), u%blade_st(j,k), crossPts, crossPtsSum, CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
+                  call calculate_InductionFactors( p%DMSTMod, p%indf, p%DMSTRes, p%Nst, OtherState%indf(:,j), u%blade_st(j,k), crossPts, crossPtsSum, p%CTmo, CTbe, indf_final_tmp, indf_final_tmp_store )
 
                else
 
@@ -824,11 +1023,7 @@ subroutine DMST_CalcOutput( u, p, OtherState, AFInfo, y, errStat, errMsg )
          end if
       end do
    end do
-
-      ! Output induced velocity values at blade nodes
-   y%Vind = Vind_st
-   y%indf = indf_final_store
-
-end subroutine DMST_CalcOutput
+         
+end subroutine calculate_Inductions_from_DMST
 !----------------------------------------------------------------------------------------------------------------------------------
 end module DMST
