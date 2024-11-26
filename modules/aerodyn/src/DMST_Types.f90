@@ -113,7 +113,7 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_theta      !< Streamtube angle of each blade node in upstream and downstream sweeps [rad]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr      !< Blade structural velocity, airfoil coordinates [m/s]
     REAL(ReKi) , DIMENSION(:,:,:), ALLOCATABLE  :: Vstr_g      !< Blade structural velocity, global coordinates [m/s]
-    REAL(ReKi) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Orientation matrix [-]
+    REAL(R8Ki) , DIMENSION(:,:,:,:), ALLOCATABLE  :: M_ag      !< Orientation matrix [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: PitchAndTwist      !< Local pitch + twist angle [rad]
     INTEGER(IntKi) , DIMENSION(:,:), ALLOCATABLE  :: blade_st      !< Streamtube corresponding to each blade node [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: UserProp      !< Optional user property for interpolating airfoils (per element per blade) [-]

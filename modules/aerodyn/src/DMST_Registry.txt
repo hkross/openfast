@@ -91,7 +91,7 @@ typedef   ^                            ^                             ReKi       
 typedef   ^                            ^                             ReKi                     blade_theta                     {:}{:}     -          -          "Streamtube angle of each blade node in upstream and downstream sweeps" rad
 typedef   ^                            ^                             ReKi                     Vstr                            {:}{:}{:}  -          -          "Blade structural velocity, airfoil coordinates" m/s
 typedef   ^                            ^                             ReKi                     Vstr_g                          {:}{:}{:}     -       -          "Blade structural velocity, global coordinates" m/s
-typedef   ^                            ^                             ReKi                     M_ag                            {:}{:}{:}{:}  -       -          "Orientation matrix" -
+typedef   ^                            ^                             R8Ki                     M_ag                            {:}{:}{:}{:}  -       -          "Orientation matrix" -
 typedef   ^                            ^                             ReKi                     PitchAndTwist                   {:}{:}     -          -          "Local pitch + twist angle" rad
 typedef   ^                            ^                             INTEGER                  blade_st                        {:}{:}     -          -          "Streamtube corresponding to each blade node" -
 typedef   ^                            ^                             ReKi                     UserProp                        {:}{:}     -          -          "Optional user property for interpolating airfoils (per element per blade)" -
