@@ -131,15 +131,15 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(2), UB(2)
+   integer(B4Ki)                  :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyInitInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
    if (allocated(SrcInitInputData%chord)) then
-      LB(1:2) = lbound(SrcInitInputData%chord, kind=B8Ki)
-      UB(1:2) = ubound(SrcInitInputData%chord, kind=B8Ki)
+      LB(1:2) = lbound(SrcInitInputData%chord)
+      UB(1:2) = ubound(SrcInitInputData%chord)
       if (.not. allocated(DstInitInputData%chord)) then
          allocate(DstInitInputData%chord(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -154,8 +154,8 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    DstInitInputData%kinVisc = SrcInitInputData%kinVisc
    DstInitInputData%numBladeNodes = SrcInitInputData%numBladeNodes
    if (allocated(SrcInitInputData%AFindx)) then
-      LB(1:2) = lbound(SrcInitInputData%AFindx, kind=B8Ki)
-      UB(1:2) = ubound(SrcInitInputData%AFindx, kind=B8Ki)
+      LB(1:2) = lbound(SrcInitInputData%AFindx)
+      UB(1:2) = ubound(SrcInitInputData%AFindx)
       if (.not. allocated(DstInitInputData%AFindx)) then
          allocate(DstInitInputData%AFindx(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -174,8 +174,8 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    if (ErrStat >= AbortErrLev) return
    DstInitInputData%RootName = SrcInitInputData%RootName
    if (allocated(SrcInitInputData%rLocal)) then
-      LB(1:2) = lbound(SrcInitInputData%rLocal, kind=B8Ki)
-      UB(1:2) = ubound(SrcInitInputData%rLocal, kind=B8Ki)
+      LB(1:2) = lbound(SrcInitInputData%rLocal)
+      UB(1:2) = ubound(SrcInitInputData%rLocal)
       if (.not. allocated(DstInitInputData%rLocal)) then
          allocate(DstInitInputData%rLocal(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -234,7 +234,7 @@ subroutine DMST_UnPackInitInput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_InitInputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackInitInput'
-   integer(B8Ki)   :: LB(2), UB(2)
+   integer(B4Ki)   :: LB(2), UB(2)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
@@ -397,15 +397,15 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(4), UB(4)
+   integer(B4Ki)                  :: LB(4), UB(4)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyOtherState'
    ErrStat = ErrID_None
    ErrMsg  = ''
    if (allocated(SrcOtherStateData%Vstr)) then
-      LB(1:3) = lbound(SrcOtherStateData%Vstr, kind=B8Ki)
-      UB(1:3) = ubound(SrcOtherStateData%Vstr, kind=B8Ki)
+      LB(1:3) = lbound(SrcOtherStateData%Vstr)
+      UB(1:3) = ubound(SrcOtherStateData%Vstr)
       if (.not. allocated(DstOtherStateData%Vstr)) then
          allocate(DstOtherStateData%Vstr(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -416,8 +416,8 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
       DstOtherStateData%Vstr = SrcOtherStateData%Vstr
    end if
    if (allocated(SrcOtherStateData%M_ag)) then
-      LB(1:4) = lbound(SrcOtherStateData%M_ag, kind=B8Ki)
-      UB(1:4) = ubound(SrcOtherStateData%M_ag, kind=B8Ki)
+      LB(1:4) = lbound(SrcOtherStateData%M_ag)
+      UB(1:4) = ubound(SrcOtherStateData%M_ag)
       if (.not. allocated(DstOtherStateData%M_ag)) then
          allocate(DstOtherStateData%M_ag(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3),LB(4):UB(4)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -428,8 +428,8 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
       DstOtherStateData%M_ag = SrcOtherStateData%M_ag
    end if
    if (allocated(SrcOtherStateData%blade_theta)) then
-      LB(1:2) = lbound(SrcOtherStateData%blade_theta, kind=B8Ki)
-      UB(1:2) = ubound(SrcOtherStateData%blade_theta, kind=B8Ki)
+      LB(1:2) = lbound(SrcOtherStateData%blade_theta)
+      UB(1:2) = ubound(SrcOtherStateData%blade_theta)
       if (.not. allocated(DstOtherStateData%blade_theta)) then
          allocate(DstOtherStateData%blade_theta(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -440,8 +440,8 @@ subroutine DMST_CopyOtherState(SrcOtherStateData, DstOtherStateData, CtrlCode, E
       DstOtherStateData%blade_theta = SrcOtherStateData%blade_theta
    end if
    if (allocated(SrcOtherStateData%indf)) then
-      LB(1:2) = lbound(SrcOtherStateData%indf, kind=B8Ki)
-      UB(1:2) = ubound(SrcOtherStateData%indf, kind=B8Ki)
+      LB(1:2) = lbound(SrcOtherStateData%indf)
+      UB(1:2) = ubound(SrcOtherStateData%indf)
       if (.not. allocated(DstOtherStateData%indf)) then
          allocate(DstOtherStateData%indf(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -498,7 +498,7 @@ subroutine DMST_UnPackOtherState(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_OtherStateType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackOtherState'
-   integer(B8Ki)   :: LB(4), UB(4)
+   integer(B4Ki)   :: LB(4), UB(4)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
@@ -515,8 +515,8 @@ subroutine DMST_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)   :: i1, i2, i3
-   integer(B8Ki)                  :: LB(3), UB(3)
+   integer(B4Ki)   :: i1, i2, i3
+   integer(B4Ki)                  :: LB(3), UB(3)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyMisc'
@@ -529,8 +529,8 @@ subroutine DMST_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (ErrStat >= AbortErrLev) return
    if (allocated(SrcMiscData%u_UA)) then
-      LB(1:3) = lbound(SrcMiscData%u_UA, kind=B8Ki)
-      UB(1:3) = ubound(SrcMiscData%u_UA, kind=B8Ki)
+      LB(1:3) = lbound(SrcMiscData%u_UA)
+      UB(1:3) = ubound(SrcMiscData%u_UA)
       if (.not. allocated(DstMiscData%u_UA)) then
          allocate(DstMiscData%u_UA(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -554,8 +554,8 @@ subroutine DMST_DestroyMisc(MiscData, ErrStat, ErrMsg)
    type(DMST_MiscVarType), intent(inout) :: MiscData
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)   :: i1, i2, i3
-   integer(B8Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1, i2, i3
+   integer(B4Ki)   :: LB(3), UB(3)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_DestroyMisc'
@@ -566,8 +566,8 @@ subroutine DMST_DestroyMisc(MiscData, ErrStat, ErrMsg)
    call UA_DestroyOutput(MiscData%y_UA, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (allocated(MiscData%u_UA)) then
-      LB(1:3) = lbound(MiscData%u_UA, kind=B8Ki)
-      UB(1:3) = ubound(MiscData%u_UA, kind=B8Ki)
+      LB(1:3) = lbound(MiscData%u_UA)
+      UB(1:3) = ubound(MiscData%u_UA)
       do i3 = LB(3), UB(3)
          do i2 = LB(2), UB(2)
             do i1 = LB(1), UB(1)
@@ -584,16 +584,16 @@ subroutine DMST_PackMisc(RF, Indata)
    type(RegFile), intent(inout) :: RF
    type(DMST_MiscVarType), intent(in) :: InData
    character(*), parameter         :: RoutineName = 'DMST_PackMisc'
-   integer(B8Ki)   :: i1, i2, i3
-   integer(B8Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1, i2, i3
+   integer(B4Ki)   :: LB(3), UB(3)
    if (RF%ErrStat >= AbortErrLev) return
    call UA_PackMisc(RF, InData%UA) 
    call UA_PackOutput(RF, InData%y_UA) 
    call RegPack(RF, allocated(InData%u_UA))
    if (allocated(InData%u_UA)) then
-      call RegPackBounds(RF, 3, lbound(InData%u_UA, kind=B8Ki), ubound(InData%u_UA, kind=B8Ki))
-      LB(1:3) = lbound(InData%u_UA, kind=B8Ki)
-      UB(1:3) = ubound(InData%u_UA, kind=B8Ki)
+      call RegPackBounds(RF, 3, lbound(InData%u_UA), ubound(InData%u_UA))
+      LB(1:3) = lbound(InData%u_UA)
+      UB(1:3) = ubound(InData%u_UA)
       do i3 = LB(3), UB(3)
          do i2 = LB(2), UB(2)
             do i1 = LB(1), UB(1)
@@ -609,8 +609,8 @@ subroutine DMST_UnPackMisc(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_MiscVarType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackMisc'
-   integer(B8Ki)   :: i1, i2, i3
-   integer(B8Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: i1, i2, i3
+   integer(B4Ki)   :: LB(3), UB(3)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
@@ -641,7 +641,7 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(2), UB(2)
+   integer(B4Ki)                  :: LB(2), UB(2)
    integer(IntKi)                 :: ErrStat2
    character(ErrMsgLen)           :: ErrMsg2
    character(*), parameter        :: RoutineName = 'DMST_CopyParam'
@@ -649,8 +649,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    ErrMsg  = ''
    DstParamData%DT = SrcParamData%DT
    if (allocated(SrcParamData%chord)) then
-      LB(1:2) = lbound(SrcParamData%chord, kind=B8Ki)
-      UB(1:2) = ubound(SrcParamData%chord, kind=B8Ki)
+      LB(1:2) = lbound(SrcParamData%chord)
+      UB(1:2) = ubound(SrcParamData%chord)
       if (.not. allocated(DstParamData%chord)) then
          allocate(DstParamData%chord(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -665,8 +665,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%kinVisc = SrcParamData%kinVisc
    DstParamData%numBladeNodes = SrcParamData%numBladeNodes
    if (allocated(SrcParamData%AFindx)) then
-      LB(1:2) = lbound(SrcParamData%AFindx, kind=B8Ki)
-      UB(1:2) = ubound(SrcParamData%AFindx, kind=B8Ki)
+      LB(1:2) = lbound(SrcParamData%AFindx)
+      UB(1:2) = ubound(SrcParamData%AFindx)
       if (.not. allocated(DstParamData%AFindx)) then
          allocate(DstParamData%AFindx(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -680,8 +680,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%Nst = SrcParamData%Nst
    DstParamData%DMSTRes = SrcParamData%DMSTRes
    if (allocated(SrcParamData%dTheta)) then
-      LB(1:1) = lbound(SrcParamData%dTheta, kind=B8Ki)
-      UB(1:1) = ubound(SrcParamData%dTheta, kind=B8Ki)
+      LB(1:1) = lbound(SrcParamData%dTheta)
+      UB(1:1) = ubound(SrcParamData%dTheta)
       if (.not. allocated(DstParamData%dTheta)) then
          allocate(DstParamData%dTheta(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -692,8 +692,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%dTheta = SrcParamData%dTheta
    end if
    if (allocated(SrcParamData%theta_st)) then
-      LB(1:1) = lbound(SrcParamData%theta_st, kind=B8Ki)
-      UB(1:1) = ubound(SrcParamData%theta_st, kind=B8Ki)
+      LB(1:1) = lbound(SrcParamData%theta_st)
+      UB(1:1) = ubound(SrcParamData%theta_st)
       if (.not. allocated(DstParamData%theta_st)) then
          allocate(DstParamData%theta_st(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -704,8 +704,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%theta_st = SrcParamData%theta_st
    end if
    if (allocated(SrcParamData%indf)) then
-      LB(1:1) = lbound(SrcParamData%indf, kind=B8Ki)
-      UB(1:1) = ubound(SrcParamData%indf, kind=B8Ki)
+      LB(1:1) = lbound(SrcParamData%indf)
+      UB(1:1) = ubound(SrcParamData%indf)
       if (.not. allocated(DstParamData%indf)) then
          allocate(DstParamData%indf(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -716,8 +716,8 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
       DstParamData%indf = SrcParamData%indf
    end if
    if (allocated(SrcParamData%CTmo)) then
-      LB(1:1) = lbound(SrcParamData%CTmo, kind=B8Ki)
-      UB(1:1) = ubound(SrcParamData%CTmo, kind=B8Ki)
+      LB(1:1) = lbound(SrcParamData%CTmo)
+      UB(1:1) = ubound(SrcParamData%CTmo)
       if (.not. allocated(DstParamData%CTmo)) then
          allocate(DstParamData%CTmo(LB(1):UB(1)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -792,7 +792,7 @@ subroutine DMST_UnPackParam(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_ParameterType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackParam'
-   integer(B8Ki)   :: LB(2), UB(2)
+   integer(B4Ki)   :: LB(2), UB(2)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
@@ -820,15 +820,15 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(4), UB(4)
+   integer(B4Ki)                  :: LB(4), UB(4)
    integer(IntKi)                 :: ErrStat2
    character(*), parameter        :: RoutineName = 'DMST_CopyInput'
    ErrStat = ErrID_None
    ErrMsg  = ''
    DstInputData%omega = SrcInputData%omega
    if (allocated(SrcInputData%omega_z)) then
-      LB(1:2) = lbound(SrcInputData%omega_z, kind=B8Ki)
-      UB(1:2) = ubound(SrcInputData%omega_z, kind=B8Ki)
+      LB(1:2) = lbound(SrcInputData%omega_z)
+      UB(1:2) = ubound(SrcInputData%omega_z)
       if (.not. allocated(DstInputData%omega_z)) then
          allocate(DstInputData%omega_z(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -839,8 +839,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%omega_z = SrcInputData%omega_z
    end if
    if (allocated(SrcInputData%Vinf)) then
-      LB(1:3) = lbound(SrcInputData%Vinf, kind=B8Ki)
-      UB(1:3) = ubound(SrcInputData%Vinf, kind=B8Ki)
+      LB(1:3) = lbound(SrcInputData%Vinf)
+      UB(1:3) = ubound(SrcInputData%Vinf)
       if (.not. allocated(DstInputData%Vinf)) then
          allocate(DstInputData%Vinf(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -851,8 +851,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%Vinf = SrcInputData%Vinf
    end if
    if (allocated(SrcInputData%blade_theta)) then
-      LB(1:2) = lbound(SrcInputData%blade_theta, kind=B8Ki)
-      UB(1:2) = ubound(SrcInputData%blade_theta, kind=B8Ki)
+      LB(1:2) = lbound(SrcInputData%blade_theta)
+      UB(1:2) = ubound(SrcInputData%blade_theta)
       if (.not. allocated(DstInputData%blade_theta)) then
          allocate(DstInputData%blade_theta(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -863,8 +863,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%blade_theta = SrcInputData%blade_theta
    end if
    if (allocated(SrcInputData%Vstr)) then
-      LB(1:3) = lbound(SrcInputData%Vstr, kind=B8Ki)
-      UB(1:3) = ubound(SrcInputData%Vstr, kind=B8Ki)
+      LB(1:3) = lbound(SrcInputData%Vstr)
+      UB(1:3) = ubound(SrcInputData%Vstr)
       if (.not. allocated(DstInputData%Vstr)) then
          allocate(DstInputData%Vstr(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -875,8 +875,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%Vstr = SrcInputData%Vstr
    end if
    if (allocated(SrcInputData%Vstr_g)) then
-      LB(1:3) = lbound(SrcInputData%Vstr_g, kind=B8Ki)
-      UB(1:3) = ubound(SrcInputData%Vstr_g, kind=B8Ki)
+      LB(1:3) = lbound(SrcInputData%Vstr_g)
+      UB(1:3) = ubound(SrcInputData%Vstr_g)
       if (.not. allocated(DstInputData%Vstr_g)) then
          allocate(DstInputData%Vstr_g(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -887,8 +887,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%Vstr_g = SrcInputData%Vstr_g
    end if
    if (allocated(SrcInputData%M_ag)) then
-      LB(1:4) = lbound(SrcInputData%M_ag, kind=B8Ki)
-      UB(1:4) = ubound(SrcInputData%M_ag, kind=B8Ki)
+      LB(1:4) = lbound(SrcInputData%M_ag)
+      UB(1:4) = ubound(SrcInputData%M_ag)
       if (.not. allocated(DstInputData%M_ag)) then
          allocate(DstInputData%M_ag(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3),LB(4):UB(4)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -899,8 +899,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%M_ag = SrcInputData%M_ag
    end if
    if (allocated(SrcInputData%PitchAndTwist)) then
-      LB(1:2) = lbound(SrcInputData%PitchAndTwist, kind=B8Ki)
-      UB(1:2) = ubound(SrcInputData%PitchAndTwist, kind=B8Ki)
+      LB(1:2) = lbound(SrcInputData%PitchAndTwist)
+      UB(1:2) = ubound(SrcInputData%PitchAndTwist)
       if (.not. allocated(DstInputData%PitchAndTwist)) then
          allocate(DstInputData%PitchAndTwist(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -911,8 +911,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%PitchAndTwist = SrcInputData%PitchAndTwist
    end if
    if (allocated(SrcInputData%blade_st)) then
-      LB(1:2) = lbound(SrcInputData%blade_st, kind=B8Ki)
-      UB(1:2) = ubound(SrcInputData%blade_st, kind=B8Ki)
+      LB(1:2) = lbound(SrcInputData%blade_st)
+      UB(1:2) = ubound(SrcInputData%blade_st)
       if (.not. allocated(DstInputData%blade_st)) then
          allocate(DstInputData%blade_st(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -923,8 +923,8 @@ subroutine DMST_CopyInput(SrcInputData, DstInputData, CtrlCode, ErrStat, ErrMsg)
       DstInputData%blade_st = SrcInputData%blade_st
    end if
    if (allocated(SrcInputData%UserProp)) then
-      LB(1:2) = lbound(SrcInputData%UserProp, kind=B8Ki)
-      UB(1:2) = ubound(SrcInputData%UserProp, kind=B8Ki)
+      LB(1:2) = lbound(SrcInputData%UserProp)
+      UB(1:2) = ubound(SrcInputData%UserProp)
       if (.not. allocated(DstInputData%UserProp)) then
          allocate(DstInputData%UserProp(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -994,7 +994,7 @@ subroutine DMST_UnPackInput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_InputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackInput'
-   integer(B8Ki)   :: LB(4), UB(4)
+   integer(B4Ki)   :: LB(4), UB(4)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
@@ -1016,14 +1016,14 @@ subroutine DMST_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrM
    integer(IntKi),  intent(in   ) :: CtrlCode
    integer(IntKi),  intent(  out) :: ErrStat
    character(*),    intent(  out) :: ErrMsg
-   integer(B8Ki)                  :: LB(3), UB(3)
+   integer(B4Ki)                  :: LB(3), UB(3)
    integer(IntKi)                 :: ErrStat2
    character(*), parameter        :: RoutineName = 'DMST_CopyOutput'
    ErrStat = ErrID_None
    ErrMsg  = ''
    if (allocated(SrcOutputData%Vind)) then
-      LB(1:3) = lbound(SrcOutputData%Vind, kind=B8Ki)
-      UB(1:3) = ubound(SrcOutputData%Vind, kind=B8Ki)
+      LB(1:3) = lbound(SrcOutputData%Vind)
+      UB(1:3) = ubound(SrcOutputData%Vind)
       if (.not. allocated(DstOutputData%Vind)) then
          allocate(DstOutputData%Vind(LB(1):UB(1),LB(2):UB(2),LB(3):UB(3)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -1034,8 +1034,8 @@ subroutine DMST_CopyOutput(SrcOutputData, DstOutputData, CtrlCode, ErrStat, ErrM
       DstOutputData%Vind = SrcOutputData%Vind
    end if
    if (allocated(SrcOutputData%indf)) then
-      LB(1:2) = lbound(SrcOutputData%indf, kind=B8Ki)
-      UB(1:2) = ubound(SrcOutputData%indf, kind=B8Ki)
+      LB(1:2) = lbound(SrcOutputData%indf)
+      UB(1:2) = ubound(SrcOutputData%indf)
       if (.not. allocated(DstOutputData%indf)) then
          allocate(DstOutputData%indf(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
          if (ErrStat2 /= 0) then
@@ -1076,7 +1076,7 @@ subroutine DMST_UnPackOutput(RF, OutData)
    type(RegFile), intent(inout)    :: RF
    type(DMST_OutputType), intent(inout) :: OutData
    character(*), parameter            :: RoutineName = 'DMST_UnPackOutput'
-   integer(B8Ki)   :: LB(3), UB(3)
+   integer(B4Ki)   :: LB(3), UB(3)
    integer(IntKi)  :: stat
    logical         :: IsAllocAssoc
    if (RF%ErrStat /= ErrID_None) return
