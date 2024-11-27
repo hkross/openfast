@@ -4466,26 +4466,6 @@ SUBROUTINE ValidateInputData( InitInp, InputFileData, NumBl, calcCrvAngle, ErrSt
          end do ! j=nodes
       end do ! k=blades
 
-      ! Perform DMST model checks.
-      if (InputFileData%Wake_Mod == WakeMod_DMST) then
-         do k=1,NumBl(iR)
-            do j=1,InputFileData%rotors(iR)%BladeProps(k)%NumBlNds
-               if ( InputFileData%rotors(iR)%BladeProps(k)%BlCrvAC(j) /= 0.0_ReKi )  then
-                  call SetErrStat( ErrID_Fatal, 'BlCrvAC for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
-                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
-               endif
-               if ( InputFileData%rotors(iR)%BladeProps(k)%BlSwpAC(j) /= 0.0_ReKi )  then
-                  call SetErrStat( ErrID_Fatal, 'BlSwpAC for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
-                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
-               endif
-               if ( InputFileData%rotors(iR)%BladeProps(k)%BlCrvAng(j) /= 0.0_ReKi )  then
-                  call SetErrStat( ErrID_Fatal, 'BlCrvAng for blade '//trim(Num2LStr(k))//' node '//trim(Num2LStr(j)) &
-                                   //' must be equal to 0 for DMST model.', ErrStat, ErrMsg, RoutineName )
-               endif
-            end do
-         end do
-      end if
-
       ! If the Buoyancy flag is True, check that the blade buoyancy coefficients are >= 0.
       if ( InputFileData%Buoyancy )  then
          do k=1,NumBl(iR)
@@ -5151,7 +5131,6 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, x
    
    call AllocAry(InitInp%chord, InitInp%numBladeNodes,InitInp%numBlades,'chord', ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
    call AllocAry(InitInp%AFindx,InitInp%numBladeNodes,InitInp%numBlades,'AFindx',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
-   call AllocAry(InitInp%radius,InitInp%numBladeNodes,InitInp%numBlades,'radius',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
    call AllocAry(InitInp%rLocal,InitInp%numBladeNodes,InitInp%numBlades,'rLocal', ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
    call AllocAry(InitInp%UA_Init%UAOff_innerNode,     InitInp%numBlades,'UAOff_innerNode',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
    call AllocAry(InitInp%UA_Init%UAOff_outerNode,     InitInp%numBlades,'UAOff_outerNode',ErrStat2,ErrMsg2); call SetErrStat(ErrStat2,ErrMsg2,ErrStat,ErrMsg,RoutineName)
@@ -5193,7 +5172,6 @@ SUBROUTINE Init_DMSTmodule( InputFileData, RotInputFileData, u_AD, u, p, p_AD, x
       do j=1,p%NumBlNds
          InitInp%chord (j,k) = RotInputFileData%BladeProps(k)%BlChord(j)
          InitInp%AFindx(j,k) = RotInputFileData%BladeProps(k)%BlAFID(j)
-         InitInp%radius(j,k) = sqrt( dot_product(tmp(:,j,k), y_hat_disk)**2 + dot_product(tmp(:,j,k), z_hat_disk)**2 )
       end do
    end do
 

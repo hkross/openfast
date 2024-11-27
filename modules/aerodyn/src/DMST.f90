@@ -83,12 +83,6 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
       return
    end if 
 
-   allocate ( p%radius(p%numBladeNodes,p%numBlades), STAT = errStat2 )
-   if ( errStat2 /= 0 ) then
-      call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%radius.', errStat, errMsg, RoutineName )
-      return
-   end if 
-
    allocate ( p%dTheta(p%numBladeNodes), STAT = errStat2 )
    if ( errStat2 /= 0 ) then
       call SetErrStat( ErrID_Fatal, 'Error allocating memory for p%dTheta.', errStat, errMsg, RoutineName )
@@ -116,7 +110,6 @@ subroutine DMST_SetParameters( InitInp, p, errStat, errMsg )
 
    p%AFindx = InitInp%AFindx 
    p%chord = InitInp%chord
-   p%radius = InitInp%radius
 
       ! Compute the total streamtube angle and azimuthal position corresponding to each streamtube
    p%dTheta = pi/p%Nst

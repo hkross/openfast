@@ -46,7 +46,6 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DMSTMod = 0_IntKi      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst = 0_IntKi      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes = 0.0_ReKi      !< Resolution of induction factor initial guess array [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: radius      !< Rotor radius [m]
     LOGICAL  :: UA_Flag = .false.      !< Logical flag indicating whether to use UnsteadyAero [-]
     TYPE(UA_InitInputType)  :: UA_Init      !< InitInput data for UA model [-]
     CHARACTER(1024)  :: RootName      !< RootName for writing output files [-]
@@ -96,7 +95,6 @@ IMPLICIT NONE
     INTEGER(IntKi)  :: DMSTMod = 0_IntKi      !< Type of momentum theory model (switch) {1=classic, 2=high load} [-]
     INTEGER(IntKi)  :: Nst = 0_IntKi      !< Number of streamtubes [-]
     REAL(ReKi)  :: DMSTRes = 0.0_ReKi      !< Resolution of induction factor initial guess array [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: radius      !< Rotor radius [m]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: dTheta      !< Total streamtube angle [rad]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: theta_st      !< Azimuthal position of streamtube midpoint [rad]
     REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: indf      !< Induction factor initial guess array [-]
@@ -170,18 +168,6 @@ subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrS
    DstInitInputData%DMSTMod = SrcInitInputData%DMSTMod
    DstInitInputData%Nst = SrcInitInputData%Nst
    DstInitInputData%DMSTRes = SrcInitInputData%DMSTRes
-   if (allocated(SrcInitInputData%radius)) then
-      LB(1:2) = lbound(SrcInitInputData%radius, kind=B8Ki)
-      UB(1:2) = ubound(SrcInitInputData%radius, kind=B8Ki)
-      if (.not. allocated(DstInitInputData%radius)) then
-         allocate(DstInitInputData%radius(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstInitInputData%radius.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstInitInputData%radius = SrcInitInputData%radius
-   end if
    DstInitInputData%UA_Flag = SrcInitInputData%UA_Flag
    call UA_CopyInitInput(SrcInitInputData%UA_Init, DstInitInputData%UA_Init, CtrlCode, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
@@ -216,9 +202,6 @@ subroutine DMST_DestroyInitInput(InitInputData, ErrStat, ErrMsg)
    if (allocated(InitInputData%AFindx)) then
       deallocate(InitInputData%AFindx)
    end if
-   if (allocated(InitInputData%radius)) then
-      deallocate(InitInputData%radius)
-   end if
    call UA_DestroyInitInput(InitInputData%UA_Init, ErrStat2, ErrMsg2)
    call SetErrStat(ErrStat2, ErrMsg2, ErrStat, ErrMsg, RoutineName)
    if (allocated(InitInputData%rLocal)) then
@@ -240,7 +223,6 @@ subroutine DMST_PackInitInput(RF, Indata)
    call RegPack(RF, InData%DMSTMod)
    call RegPack(RF, InData%Nst)
    call RegPack(RF, InData%DMSTRes)
-   call RegPackAlloc(RF, InData%radius)
    call RegPack(RF, InData%UA_Flag)
    call UA_PackInitInput(RF, InData%UA_Init) 
    call RegPack(RF, InData%RootName)
@@ -265,7 +247,6 @@ subroutine DMST_UnPackInitInput(RF, OutData)
    call RegUnpack(RF, OutData%DMSTMod); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Nst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DMSTRes); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%radius); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%UA_Flag); if (RegCheckErr(RF, RoutineName)) return
    call UA_UnpackInitInput(RF, OutData%UA_Init) ! UA_Init 
    call RegUnpack(RF, OutData%RootName); if (RegCheckErr(RF, RoutineName)) return
@@ -698,18 +679,6 @@ subroutine DMST_CopyParam(SrcParamData, DstParamData, CtrlCode, ErrStat, ErrMsg)
    DstParamData%DMSTMod = SrcParamData%DMSTMod
    DstParamData%Nst = SrcParamData%Nst
    DstParamData%DMSTRes = SrcParamData%DMSTRes
-   if (allocated(SrcParamData%radius)) then
-      LB(1:2) = lbound(SrcParamData%radius, kind=B8Ki)
-      UB(1:2) = ubound(SrcParamData%radius, kind=B8Ki)
-      if (.not. allocated(DstParamData%radius)) then
-         allocate(DstParamData%radius(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstParamData%radius.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstParamData%radius = SrcParamData%radius
-   end if
    if (allocated(SrcParamData%dTheta)) then
       LB(1:1) = lbound(SrcParamData%dTheta, kind=B8Ki)
       UB(1:1) = ubound(SrcParamData%dTheta, kind=B8Ki)
@@ -779,9 +748,6 @@ subroutine DMST_DestroyParam(ParamData, ErrStat, ErrMsg)
    if (allocated(ParamData%AFindx)) then
       deallocate(ParamData%AFindx)
    end if
-   if (allocated(ParamData%radius)) then
-      deallocate(ParamData%radius)
-   end if
    if (allocated(ParamData%dTheta)) then
       deallocate(ParamData%dTheta)
    end if
@@ -813,7 +779,6 @@ subroutine DMST_PackParam(RF, Indata)
    call RegPack(RF, InData%DMSTMod)
    call RegPack(RF, InData%Nst)
    call RegPack(RF, InData%DMSTRes)
-   call RegPackAlloc(RF, InData%radius)
    call RegPackAlloc(RF, InData%dTheta)
    call RegPackAlloc(RF, InData%theta_st)
    call RegPackAlloc(RF, InData%indf)
@@ -841,7 +806,6 @@ subroutine DMST_UnPackParam(RF, OutData)
    call RegUnpack(RF, OutData%DMSTMod); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%Nst); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpack(RF, OutData%DMSTRes); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%radius); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%dTheta); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%theta_st); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return

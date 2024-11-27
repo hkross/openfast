@@ -27,7 +27,6 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
-typedef   ^                            ^                             ReKi                     radius                          {:}{:}     -          -          "Rotor radius" m                 
 typedef   ^                            ^                             LOGICAL                  UA_Flag                         -          -          -          "Logical flag indicating whether to use UnsteadyAero"        -
 typedef   ^                            ^                             UA_InitInputType         UA_Init                         -          -          -          "InitInput data for UA model"
 typedef   ^                            ^                             CHARACTER(1024)          RootName                        -          -          -          "RootName for writing output files" -
@@ -74,7 +73,6 @@ typedef   ^                            ^                             INTEGER    
 typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
 typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
 typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
-typedef   ^                            ^                             ReKi                     radius                          {:}{:}     -          -          "Rotor radius" m
 typedef   ^                            ^                             ReKi                     dTheta                          {:}        -          -          "Total streamtube angle" rad
 typedef   ^                            ^                             ReKi                     theta_st                        {:}        -          -          "Azimuthal position of streamtube midpoint" rad
 typedef   ^                            ^                             ReKi                     indf                            {:}        -          -          "Induction factor initial guess array" -
