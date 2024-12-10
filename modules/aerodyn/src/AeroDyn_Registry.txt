@@ -13,6 +13,7 @@
 include	Registry_NWTC_Library.txt
 usefrom	AirfoilInfo_Registry.txt
 usefrom	BEMT_Registry.txt
+usefrom	DMST_Registry.txt
 usefrom FVW_Registry.txt
 usefrom	UnsteadyAero_Registry.txt
 usefrom AeroAcoustics_Registry.txt
@@ -24,6 +25,7 @@ param    ^              -  IntKi    WakeMod_none            -  0  -  "Wake model
 param    ^              -  IntKi    WakeMod_BEMT            -  1  -  "Wake model - BEMT (blade elememnt momentum theory)"     -
 #param    ^              -  IntKi    WakeMod_TODO           -  2  -  "Wake model - TBD"  -
 param    ^              -  IntKi    WakeMod_FVW             -  3  -  "Wake model - FVW (free vortex wake, OLAF)"              -
+param    ^              -  IntKi    WakeMod_DMST            -  4  -  "Wake model - DMST (double multiple streamtube theory)"  -
 
 param    ^              -  IntKi    TwrPotent_none          -  0  -  "no tower potential flow"                    -
 param    ^              -  IntKi    TwrPotent_baseline      -  1  -  "baseline tower potential flow"              -
@@ -246,6 +248,9 @@ typedef	^	AD_InputFile	IntKi	NumOuts	-	-	-	"Number of parameters in the output l
 typedef	^	AD_InputFile	CHARACTER(ChanLen)	OutList	{:}	-	-	"List of user-requested output channels"	-
 typedef	^	AD_InputFile	ReKi	tau1_const	-	-	-	"time constant for DBEMT"	s
 typedef	^	AD_InputFile	IntKi	DBEMT_Mod	-	-	-	"Type of dynamic BEMT (DBEMT) model {0=No Dynamic Wake, -1=Frozen Wake for linearization, 1=constant tau1, 2=time-dependent tau1, 3=constant tau1 with continuous formulation} (-) [used only when WakeMod=1]" -
+typedef	^	AD_InputFile	IntKi	DMSTMod     -   -   -   "Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]" -
+typedef	^	AD_InputFile	IntKi	Nst      	-	-	-	"Number of streamtubes [used only when WakeMod=4]"	-
+typedef	^	AD_InputFile	ReKi	DMSTRes	    -	-	-	"Resolution of induction factor initial guess array [used only when WakeMod=4]"	-
 typedef	^	AD_InputFile	IntKi	BldNd_NumOuts	-	-	-	"Number of requested output channels per blade node (AD_AllBldNdOuts)"	-
 typedef	^	AD_InputFile	CHARACTER(ChanLen)	BldNd_OutList	{:}	-	-	"List of user-requested output channels (AD_AllBldNdOuts)"	-
 #typedef  ^  AD_InputFile   IntKi BldNd_BlOutNd {:} - - "The blade nodes to actually output (AD_AllBldNdOuts)" -
@@ -262,6 +267,7 @@ typedef  ^  AD_InputFile   RotInputFile  rotors {:} - - "Rotor (blades and tower
 # ..... States ....................................................................................................................
 # Define continuous (differentiable) states here:
 typedef	^	RotContinuousStateType	BEMT_ContinuousStateType	BEMT	-	-	-	"Continuous states from the BEMT module"	-
+typedef	^	RotContinuousStateType	DMST_ContinuousStateType	DMST	-	-	-	"Continuous states from the DMST module"	-
 typedef	^	RotContinuousStateType	AA_ContinuousStateType	AA	-	-	-	"Continuous states from the AA module"	-
 
 typedef	^	ContinuousStateType	RotContinuousStateType	rotors	{:}	-	-	"Continuous states for each rotor"	-
@@ -270,6 +276,7 @@ typedef	^	ContinuousStateType	FVW_ContinuousStateType	FVW	-	-	-	"Continuous stat
 
 # Define discrete (nondifferentiable) states here:
 typedef	^	RotDiscreteStateType	BEMT_DiscreteStateType	BEMT	-	-	-	"Discrete states from the BEMT module"	-
+typedef	^	RotDiscreteStateType	DMST_DiscreteStateType	DMST	-	-	-	"Discrete states from the DMST module"	-
 typedef	^	RotDiscreteStateType	AA_DiscreteStateType	AA	-	-	-	"Discrete states from the AA module"	-
 
 typedef	^	DiscreteStateType	RotDiscreteStateType	rotors	{:}	-	-	"Discrete states for each rotor"	-
@@ -284,6 +291,7 @@ typedef	^	ConstraintStateType	FVW_ConstraintStateType	FVW	-	-	-	"Constraint stat
 
 # Define "other" states here:
 typedef	^	RotOtherStateType	BEMT_OtherStateType	BEMT	-	-	-	"OtherStates from the BEMT module"	-
+typedef	^	RotOtherStateType	DMST_OtherStateType	DMST	-	-	-	"OtherStates from the DMST module"	-
 typedef	^	RotOtherStateType	AA_OtherStateType	AA	-	-	-	"OtherStates from the AA module"	-
 
 typedef	^	OtherStateType	RotOtherStateType	rotors	{:}	-	-	"OtherStates from the BEMT module"	-
@@ -292,9 +300,30 @@ typedef	^	OtherStateType	ReKi	WakeLocationPoints	{:}{:}	-	-	"wake points velocit
 
 
 # Define misc/optimization variables (any data that are not considered actual states) here:
+typedef ^   BldMiscVarType  ReKi            BN_AxInd      {:}      -  -  "Axial induction [size (NumBlNds,numBlades)]" -
+typedef ^   BldMiscVarType  ReKi            BN_TanInd     {:}      -  -  "Tangential induction [size (NumBlNds,numBlades)]" -
+typedef ^   BldMiscVarType  ReKi            BN_Vrel       {:}      -  -  "Relative velocity [size (NumBlNds,numBlades)]" m/s
+typedef ^   BldMiscVarType  ReKi            BN_alpha      {:}      -  -  "Angle of attack [size (NumBlNds,numBlades)]" rad
+typedef ^   BldMiscVarType  ReKi            BN_phi        {:}      -  -  "angle between the plane of rotation and the direction of the local wind [size (NumBlNds,numBlades)]" rad
+typedef ^   BldMiscVarType  ReKi            BN_Re         {:}      -  -  "Reynolds number [size (NumBlNds,numBlades)]" -
+typedef ^   BldMiscVarType  ReKi            BN_URelWind_s {:}{:}   -  -  "Relative wind velocity in section coordinates [size (3,NumBlNds,numBlades)]" m/s
+typedef ^   BldMiscVarType  ReKi            BN_Cl_Static  {:}      -  -  "Coefficient lift,   excluding unsteady aero effects" - 
+typedef ^   BldMiscVarType  ReKi            BN_Cd_Static  {:}      -  -  "Coefficient drag.   excluding unsteady aero effects" -
+typedef ^   BldMiscVarType  ReKi            BN_Cm_Static  {:}      -  -  "Coefficient moment, excluding unsteady aero effects" -
+typedef ^   BldMiscVarType  ReKi            BN_Cpmin      {:}      -  -  "Coefficient minimum pressure" -
+typedef ^   BldMiscVarType  ReKi            BN_Cl         {:}      -  -  "Coefficient lift,   including unsteady aero effects" -
+typedef ^   BldMiscVarType  ReKi            BN_Cd         {:}      -  -  "Coefficient drag,   including unsteady aero effects" -
+typedef ^   BldMiscVarType  ReKi            BN_Cm         {:}      -  -  "Coefficient moment, including unsteady aero effects" -
+typedef ^   BldMiscVarType  ReKi            BN_Cx         {:}      -  -  "normal force coefficient (normal to the plane, not chord) of the jth node in the kth blade"   -
+typedef ^   BldMiscVarType  ReKi            BN_Cy         {:}      -  -  "tangential force coefficient (tangential to the plane, not chord) of the jth node in the kth blade"   -
+
+typedef	^	RotMiscVarType	BldMiscVarType  blds   {:}  -   -   "MiscVars for each blade"	-
 typedef	^	RotMiscVarType	BEMT_MiscVarType	BEMT	-	-	-	"MiscVars from the BEMT module"	-
+typedef	^	RotMiscVarType	DMST_MiscVarType	DMST	-	-	-	"MiscVars from the DMST module"	-
 typedef	^	RotMiscVarType	BEMT_OutputType	BEMT_y	-	-	-	"Outputs from the BEMT module"	-
 typedef	^	RotMiscVarType	BEMT_InputType	BEMT_u	2	-	-	"Inputs to the BEMT module"	-
+typedef	^	RotMiscVarType	DMST_OutputType	DMST_y	-	-	-	"Outputs from the DMST module"	-
+typedef	^	RotMiscVarType	DMST_InputType	DMST_u	2	-	-	"Inputs to the DMST module"	-
 typedef	^	RotMiscVarType	AA_MiscVarType	AA	-	-	-	"MiscVars from the AA module"	-
 typedef	^	RotMiscVarType	AA_OutputType	AA_y	-	-	-	"Outputs from the AA module"	-
 typedef	^	RotMiscVarType	AA_InputType	AA_u	-	-	-	"Inputs to the AA module"	-
@@ -444,6 +473,7 @@ typedef ^   RotParameterType	ReKi	TwrAxCent {:}	    -	-	"Array of tower element 
 typedef ^   RotParameterType	ReKi	TwrIT     {:}   	-	-	"Array of tower node tangential inertia factor" kg/m
 typedef ^   RotParameterType	ReKi	TwrAT     {:}   	-	-	"Array of tower node tangential added mass factor" kg/m
 typedef	^	RotParameterType	BEMT_ParameterType	BEMT	-	-	-	"Parameters for BEMT module"
+typedef	^	RotParameterType	DMST_ParameterType	DMST	-	-	-	"Parameters for DMST module"
 typedef	^	RotParameterType	AA_ParameterType	AA	-	-	-	"Parameters for AA module"
 typedef	^	RotParameterType	IntKi	Jac_u_indx	{:}{:}	-	-	"matrix to help fill/pack the u vector in computing the jacobian"	-
 typedef	^	RotParameterType	Jac_u_idxStarts Jac_u_idxStartList	-	-	-	"Starting indices for all Jac_u components" -

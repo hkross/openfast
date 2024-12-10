@@ -24,7 +24,7 @@ MODULE AeroDyn_IO
    use AeroDyn_IO_Params
    use AeroDyn_Types
    use BEMTUncoupled, only : VelocityIsZero
-   use FVW_Subs,      only : FVW_AeroOuts
+   use FVW_Subs,      only : LL_AeroOuts
 
    USE AeroDyn_AllBldNdOuts_IO
    
@@ -114,6 +114,8 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, RotInflow, x, m, m_AD, y, OtherState, x
    REAL(ReKi)                                   :: denom, rmax, omega
    REAL(ReKi)                                   :: ct, st ! cosine, sine of theta
    REAL(ReKi)                                   :: cp, sp ! cosine, sine of phi
+   REAL(ReKi)                                   :: ca, sa ! cosine, sine of alpha
+   REAL(ReKi)                                   :: Fl, Fd
       
    
       ! start routine:
@@ -125,7 +127,7 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, RotInflow, x, m, m_AD, y, OtherState, x
    if (p%NumBlades == 0) then
       rmax  = 0.0_ReKi
       omega = 0.0_ReKi
-   elseif (p_AD%Wake_Mod /= WakeMod_FVW) then
+   elseif (p_AD%Wake_Mod /= WakeMod_FVW .and. p_AD%Wake_Mod /= WakeMod_DMST) then
       rmax = 0.0_ReKi
       do k=1,p%NumBlades
          do j=1,p%NumBlNds
@@ -139,15 +141,15 @@ SUBROUTINE Calc_WriteOutput( p, p_AD, u, RotInflow, x, m, m_AD, y, OtherState, x
       rmax  = Calc_MaxRadius(p, u)
       omega = Calc_Omega(u)
    endif
-
+  
    
    ! Common outputs to all AeroDyn submodules
    call Calc_WriteOutput_AD() ! need to call this before calling the BEMT vs FVW versions of outputs so that the integrated output quantities are known
    
-   if (p_AD%Wake_Mod /= WakeMod_FVW) then
+   if (p_AD%Wake_Mod /= WakeMod_FVW .and. p_AD%Wake_Mod /= WakeMod_DMST) then
       call Calc_WriteOutput_BEMT()
    else
-      call Calc_WriteOutput_FVW()
+      call Calc_WriteOutput_LL()
    endif
 
       ! set these for debugging
@@ -310,7 +312,11 @@ CONTAINS
    
 
       m%AllOuts( RtSpeed ) = omega*RPS2RPM
-      m%AllOuts( RtArea  ) = pi * rmax**2
+      if ( p_AD%Wake_Mod == WakeMod_DMST ) then
+         m%AllOuts( RtArea ) = 2.0_ReKi*rmax*abs(u%BladeMotion(1)%Position(3,p%NumBlNds) - u%BladeMotion(1)%Position(3,1))
+      else
+         m%AllOuts( RtArea  ) = pi * rmax**2
+      end if
       
       tmp = matmul( u%HubMotion%Orientation(:,:,1), m%V_DiskAvg )
       m%AllOuts( RtVAvgxh ) = tmp(1)
@@ -510,65 +516,86 @@ CONTAINS
    !! NOTE: relies on the prior calculation of m%V_dot_x, and m%V_diskAvg (done in DiskAvgValues)
    !!                                          m%DisturbedInflow (done in SetInputs)
    !!       Make sure these are set!
-   subroutine Calc_WriteOutput_FVW
+   subroutine Calc_WriteOutput_LL
       integer    :: iW
 
       ! Induced velocity in global
       ! FVW already return this, we do a simple copy from Wings to Blades
       do k=1,min(p%numBlades,3)
-         iW = p_AD%FVW%Bld2Wings(iRot, k)
-         do j=1,u%BladeMotion(k)%NNodes
-            m%Vind_i(:,j,k) = m_AD%FVW_y%W(iW)%Vind(1:3,j)
-         enddo
+         if ( p_AD%Wake_Mod == WakeMod_FVW ) then
+            iW=p_AD%FVW%Bld2Wings(iRot, k)
+            do j=1,u%BladeMotion(k)%NNodes
+               m%Vind_i(:,j,k) = m_AD%FVW_y%W(iW)%Vind(1:3,j)
+            enddo
+         elseif ( p_AD%Wake_Mod == WakeMod_DMST ) then
+            do j=1,u%BladeMotion(k)%NNodes
+               m%Vind_i(:,j,k) = m%DMST_y%Vind(1:3,j,k)
+            enddo
+         endif
       enddo
 
       ! TODO TODO TODO ALL THIS SHOULD BE COMPUTED IN THE SAME MEMORY FORMAT AS AERODYN
 
          ! blade outputs
       do k=1,min(p%numBlades,3)
-         iW=p_AD%FVW%Bld2Wings(iRot, k)
+
+         if ( p_AD%Wake_Mod == WakeMod_FVW ) then
+            iW=p_AD%FVW%Bld2Wings(iRot, k)
+         endif
 
          do beta=1,p%NBlOuts
             j=p%BlOutNd(beta)
 
-            m%AllOuts( BNVrel( beta,k) ) = m_AD%FVW%W(iW)%BN_Vrel(j)
-            m%AllOuts( BNDynP( beta,k) ) = 0.5 * p%airDens * m_AD%FVW%W(iW)%BN_Vrel(j)**2
-            m%AllOuts( BNRe(   beta,k) ) = m_AD%FVW%W(iW)%BN_Re(j)  / 1.0E6
-            m%AllOuts( BNM(    beta,k) ) = m_AD%FVW%W(iW)%BN_Vrel(j) / p%SpdSound
+            m%AllOuts( BNVrel( beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Vrel(j)
+            m%AllOuts( BNDynP( beta,k) ) = 0.5 * p%airDens * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j)**2
+            m%AllOuts( BNRe(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Re(j)  / 1.0E6
+            m%AllOuts( BNM(    beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) / p%SpdSound
 
-            m%AllOuts( BNVIndx(beta,k) ) = -m_AD%FVW%W(iW)%BN_UrelWind_s(1,j) * m_AD%FVW%W(iW)%BN_AxInd(j)
-            m%AllOuts( BNVIndy(beta,k) ) =  m_AD%FVW%W(iW)%BN_UrelWind_s(2,j) * m_AD%FVW%W(iW)%BN_TanInd(j)
+            m%AllOuts( BNVIndx(beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_UrelWind_s(1,j) * m_AD%rotors(iRot)%blds(k)%BN_AxInd(j)
+            m%AllOuts( BNVIndy(beta,k) ) =  m_AD%rotors(iRot)%blds(k)%BN_UrelWind_s(2,j) * m_AD%rotors(iRot)%blds(k)%BN_TanInd(j)
 
-            m%AllOuts( BNAxInd(beta,k) ) = m_AD%FVW%W(iW)%BN_AxInd(j)
-            m%AllOuts( BNTnInd(beta,k) ) = m_AD%FVW%W(iW)%BN_TanInd(j)
+            m%AllOuts( BNAxInd(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_AxInd(j)
+            m%AllOuts( BNTnInd(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_TanInd(j)
 
-            m%AllOuts( BNAlpha(beta,k) ) = m_AD%FVW%W(iW)%BN_alpha(j)*R2D
-            m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
-            m%AllOuts( BNPhi(  beta,k) ) = m_AD%FVW%W(iW)%BN_phi(j)*R2D
+            m%AllOuts( BNAlpha(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_alpha(j)*R2D
+            if ( p_AD%Wake_Mod == WakeMod_FVW ) then
+               m%AllOuts( BNTheta(beta,k) ) = m_AD%FVW%W(iW)%PitchAndTwist(j)*R2D
+            else
+               m%AllOuts( BNTheta(beta,k) ) = m_AD%rotors(iRot)%DMST_u(indx)%PitchAndTwist(j,k)*R2D
+            endif
+            m%AllOuts( BNPhi(  beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_phi(j)*R2D
 
-            m%AllOuts( BNCpmin(beta,k) ) = m_AD%FVW%W(iW)%BN_Cpmin(j)
-            m%AllOuts( BNCl(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cl(j)
-            m%AllOuts( BNCd(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cd(j)
-            m%AllOuts( BNCm(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cm(j)
-            m%AllOuts( BNCx(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cx(j)
-            m%AllOuts( BNCy(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cy(j)
+            m%AllOuts( BNCpmin(beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cpmin(j)
+            m%AllOuts( BNCl(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)
+            m%AllOuts( BNCd(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cd(j)
+            m%AllOuts( BNCm(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cm(j)
+            m%AllOuts( BNCx(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cx(j)
+            m%AllOuts( BNCy(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cy(j)
 
-            ct=cos(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! cos(theta)
-            st=sin(m_AD%FVW%W(iW)%PitchAndTwist(j))    ! sin(theta)
-            m%AllOuts( BNCn(   beta,k) ) = m_AD%FVW%W(iW)%BN_Cx(j)*ct + m_AD%FVW%W(iW)%BN_Cy(j)*st
-            m%AllOuts( BNCt(   beta,k) ) =-m_AD%FVW%W(iW)%BN_Cx(j)*st + m_AD%FVW%W(iW)%BN_Cy(j)*ct
+            cp=cos(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
+            sp=sin(m_AD%rotors(iRot)%blds(k)%BN_phi(j))
+            ca=cos(m_AD%rotors(iRot)%blds(k)%BN_alpha(j))
+            sa=sin(m_AD%rotors(iRot)%blds(k)%BN_alpha(j))
 
-            cp=cos(m_AD%FVW%W(iW)%BN_phi(j))
-            sp=sin(m_AD%FVW%W(iW)%BN_phi(j))
+            m%AllOuts( BNCn(   beta,k) ) = m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*ca + m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*sa
+            m%AllOuts( BNCt(   beta,k) ) = -m_AD%rotors(iRot)%blds(k)%BN_Cd(j)*ca + m_AD%rotors(iRot)%blds(k)%BN_Cl(j)*sp
+
             m%AllOuts( BNFl(   beta,k) ) =  m%X(j,k)*cp - m%Y(j,k)*sp
             m%AllOuts( BNFd(   beta,k) ) =  m%X(j,k)*sp + m%Y(j,k)*cp
             m%AllOuts( BNMm(   beta,k) ) =  m%M(j,k)
             m%AllOuts( BNFx(   beta,k) ) =  m%X(j,k)
             m%AllOuts( BNFy(   beta,k) ) = -m%Y(j,k)
-            m%AllOuts( BNFn(   beta,k) ) =  m%X(j,k)*ct - m%Y(j,k)*st
-            m%AllOuts( BNFt(   beta,k) ) = -m%X(j,k)*st - m%Y(j,k)*ct
 
-            m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%FVW%W(iW)%BN_Vrel(j) * m_AD%FVW%W(iW)%BN_Cl(j) ! "Gam" [m^2/s]
+            Fl=m%X(j,k)*cp - m%Y(j,k)*sp
+            Fd=m%X(j,k)*sp + m%Y(j,k)*cp
+            m%AllOuts( BNFn(   beta,k) )  = Fl*ca + Fd*sa
+            m%AllOuts( BNFt(   beta,k) )  = -Fd*ca + Fl*sa
+
+            if ( p_AD%Wake_Mod == WakeMod_FVW ) then
+               m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%FVW%W(iW)%chord_LL(j) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
+            else
+               m%AllOuts( BNGam(  beta,k) ) = 0.5_ReKi * p_AD%rotors(iRot)%DMST%chord(j,k) * m_AD%rotors(iRot)%blds(k)%BN_Vrel(j) * m_AD%rotors(iRot)%blds(k)%BN_Cl(j) ! "Gam" [m^2/s]
+            endif
          end do ! nodes
       end do ! blades
 
@@ -583,7 +610,7 @@ CONTAINS
       end if
       m%AllOuts( DBEMTau1 ) = 0.0_ReKi ! not valid with FVW
 
-   end subroutine Calc_WriteOutput_FVW
+   end subroutine Calc_WriteOutput_LL
 
    
 END SUBROUTINE Calc_WriteOutput
@@ -771,8 +798,8 @@ SUBROUTINE ParsePrimaryFileInfo( PriPath, InitInp, InputFile, RootName, NumBlade
       if (Failed()) return
    ! WakeMod - LEGACY 
    call ParseVar( FileInfo_In, CurLine, "WakeMod", WakeMod_Old, ErrStat2, ErrMsg2, UnEc)
-   wakeModProvided = legacyInputPresent('WakeMod', CurLine, ErrStat2, ErrMsg2, 'Wake_Mod=0 (WakeMod=0), Wake_Mod=1 (WakeMod=1), DBEMT_Mod>0 (WakeMod=2), Wake_Mod=3 (WakeMod=3)')
-   ! Wake_Mod- Type of wake/induction model (switch) {0=none, 1=BEMT, 2=TBD, 3=OLAF}
+   wakeModProvided = legacyInputPresent('WakeMod', CurLine, ErrStat2, ErrMsg2, 'Wake_Mod=0 (WakeMod=0), Wake_Mod=1 (WakeMod=1), DBEMT_Mod>0 (WakeMod=2), Wake_Mod=3 (WakeMod=3), Wake_Mod=4 (WakeMod=4)')
+   ! Wake_Mod- Type of wake/induction model (switch) {0=none, 1=BEMT, 2=TBD, 3=OLAF, 4=DMST}
    call ParseVar( FileInfo_In, CurLine, "Wake_Mod", InputFileData%Wake_Mod, ErrStat2, ErrMsg2, UnEc )
    if (newInputMissing('Wake_Mod', CurLine, errStat2, errMsg2)) then
       call WrScr('         Setting Wake_Mod to 1 (BEM active) as the input is Missing (typical behavior).')
@@ -944,6 +971,19 @@ SUBROUTINE ParsePrimaryFileInfo( PriPath, InitInp, InputFile, RootName, NumBlade
    call ParseVar( FileInfo_In, CurLine, "OLAFInputFileName", InputFileData%FVWFileName, ErrStat2, ErrMsg2, UnEc )
       if (Failed()) return
       IF ( PathIsRelative( InputFileData%FVWFileName ) ) InputFileData%FVWFileName = TRIM(PriPath)//TRIM(InputFileData%FVWFileName)
+
+   !======  Double Multiple Streamtube Theory Options  ================================================== [used only when WakeMod=4]
+   if ( InputFileData%Echo )   WRITE(UnEc, '(A)') FileInfo_In%Lines(CurLine)    ! Write section break to echo
+   CurLine = CurLine + 1
+      ! DMSTMod - Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]
+   call ParseVar( FileInfo_In, CurLine, "DMSTMod", InputFileData%DMSTMod, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return   
+      ! Nst - Number of streamtubes [used only when WakeMod=4]
+   call ParseVar( FileInfo_In, CurLine, "Nst", InputFileData%Nst, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return
+      ! DMSTRes - Resolution of induction factor initial guess array [used only when WakeMod=4]
+   call ParseVarWDefault( FileInfo_In, CurLine, "DMSTRes", InputFileData%DMSTRes, .01_ReKi, ErrStat2, ErrMsg2, UnEc )
+      if (Failed()) return
 
    !======  Beddoes-Leishman Unsteady Airfoil Aerodynamics Options  ===================================== [used only when AFAeroMod=2]
    call ParseCom (FileInfo_in, CurLine, sDummy, errStat2, errMsg2, UnEc, isLegalComment); if (Failed()) return
@@ -1790,6 +1830,8 @@ SUBROUTINE AD_PrintSum( InputFileData, p, p_AD, u, y, NumBlades, BladeInputFileD
          Msg = 'Blade-Element/Momentum Theory'
       case (WakeMod_FVW)
          Msg = 'Free Vortex Wake Theory'
+      case (WakeMod_DMST)
+         Msg = 'Double Multiple Streamtube Theory'
       case (WakeMod_None)
          Msg = 'steady'
       case default      
@@ -2135,7 +2177,7 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       InvalidOutput( DBEMTau1 ) = .true.
    end if
 
-   if ( p%MHK == 0 ) then  ! Invalid buoyant loads
+   if (p%MHK == 0 .or. p_AD%Wake_Mod == WakeMod_DMST) then  ! Invalid buoyant loads
       InvalidOutput( HbFbx ) = .true.
       InvalidOutput( HbFby ) = .true.
       InvalidOutput( HbFbz ) = .true.
@@ -2172,6 +2214,120 @@ SUBROUTINE SetOutParam(OutList, p, p_AD, ErrStat, ErrMsg )
       do i = 1,size(BNMbs,2)
          InvalidOutput( BNMbs(:,i) ) = .true.
       end do
+   end if
+
+   if (p_AD%Wake_Mod == WakeMod_DMST) then
+      do i = 1,size(BNVundx,2)
+         InvalidOutput( BNVundx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVundy,2)
+         InvalidOutput( BNVundy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVundz,2)
+         InvalidOutput( BNVundz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisx,2)
+         InvalidOutput( BNVdisx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisy,2)
+         InvalidOutput( BNVdisy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVdisz,2)
+         InvalidOutput( BNVdisz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVx,2)
+         InvalidOutput( BNSTVx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVy,2)
+         InvalidOutput( BNSTVy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSTVz,2)
+         InvalidOutput( BNSTVz(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVindx,2)
+         InvalidOutput( BNVindx(:,i) ) = .true.
+      end do
+      do i = 1,size(BNVindy,2)
+         InvalidOutput( BNVindy(:,i) ) = .true.
+      end do
+      do i = 1,size(BNClrnc,2)
+         InvalidOutput( BNClrnc(:,i) ) = .true.
+      end do
+      do i = 1,size(BNCpmin,2)
+         InvalidOutput( BNCpmin(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSigCr,2)
+         InvalidOutput( BNSigCr(:,i) ) = .true.
+      end do
+      do i = 1,size(BNSgCav,2)
+         InvalidOutput( BNSgCav(:,i) ) = .true.
+      end do
+      do i = 1,size(BNFx,2)
+         InvalidOutput( BNFx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNFy,2)
+         InvalidOutput( BNFy(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCx,2)
+         InvalidOutput( BNCx(:,i)    ) = .true.
+      end do
+      do i = 1,size(BNCy,2)
+         InvalidOutput( BNCy(:,i)    ) = .true.
+      end do
+      do i = 1,size(TwNVUnd,1)
+         InvalidOutput( TwNVUnd(i,:) ) = .true.
+      end do
+      do i = 1,size(TwNSTV,1)
+         InvalidOutput( TwNSTV(i,:)  ) = .true.
+      end do
+      InvalidOutput( BAzimuth ) = .true.
+      InvalidOutput( BPitch   ) = .true.
+      InvalidOutput( TwNVrel  ) = .true.
+      InvalidOutput( TwNDynP  ) = .true.
+      InvalidOutput( TwNRe    ) = .true.
+      InvalidOutput( TwNM     ) = .true.
+      InvalidOutput( TwNFdx   ) = .true.
+      InvalidOutput( TwNFdy   ) = .true.
+      InvalidOutput( TFAlpha  ) = .true.
+      InvalidOutput( TFMach   ) = .true.
+      InvalidOutput( TFRe     ) = .true.
+      InvalidOutput( TFVrel   ) = .true.
+      InvalidOutput( TFVundxi ) = .true.
+      InvalidOutput( TFVundyi ) = .true.
+      InvalidOutput( TFVundzi ) = .true.
+      InvalidOutput( TFVindxi ) = .true.
+      InvalidOutput( TFVindyi ) = .true.
+      InvalidOutput( TFVindzi ) = .true.
+      InvalidOutput( TFVrelxi ) = .true.
+      InvalidOutput( TFVrelyi ) = .true.
+      InvalidOutput( TFVrelzi ) = .true.
+      InvalidOutput( TFSTVxi  ) = .true.
+      InvalidOutput( TFSTVyi  ) = .true.
+      InvalidOutput( TFSTVzi  ) = .true.
+      InvalidOutput( TFFxi    ) = .true.
+      InvalidOutput( TFFyi    ) = .true.
+      InvalidOutput( TFFzi    ) = .true.
+      InvalidOutput( TFMxi    ) = .true.
+      InvalidOutput( TFMyi    ) = .true.
+      InvalidOutput( TFMzi    ) = .true.
+      InvalidOutput( RtSkew   ) = .true.
+      InvalidOutput( RtTSR    ) = .true.
+      InvalidOutput( RtAeroCp ) = .true.
+      InvalidOutput( RtAeroCq ) = .true.
+      InvalidOutput( RtAeroCt ) = .true.
+      InvalidOutput( DBEMTau1 ) = .true.
+      InvalidOutput( NcFdx    ) = .true.
+      InvalidOutput( NcFdy    ) = .true.
+      InvalidOutput( NcFdz    ) = .true.
+      InvalidOutput( NcMdx    ) = .true.
+      InvalidOutput( NcMdy    ) = .true.
+      InvalidOutput( NcMdz    ) = .true.
+      InvalidOutput( NcFxi    ) = .true.
+      InvalidOutput( NcFyi    ) = .true.
+      InvalidOutput( NcFzi    ) = .true.
+      InvalidOutput( NcMxi    ) = .true.
+      InvalidOutput( NcMyi    ) = .true.
+      InvalidOutput( NcMzi    ) = .true.
    end if
 
    if (.not. p%NacelleDrag) then  ! Invalid Nacelle Drag loads

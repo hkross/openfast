@@ -199,22 +199,6 @@ IMPLICIT NONE
     TYPE(UA_OutputType)  :: y_UA      !< outputs from UnsteadyAero [-]
     TYPE(UA_ParameterType)  :: p_UA      !< parameters for UnsteadyAero [-]
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: Vind_LL      !< Induced velocity on lifting line nodes [m/s]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_AxInd      !< Axial induction [size (NumBlNds,numBlades)] [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_TanInd      !< Tangential induction [size (NumBlNds,numBlades)] [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Vrel      !< Relative velocity [size (NumBlNds,numBlades)] [m/s]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_alpha      !< Angle of attack [size (NumBlNds,numBlades)] [rad]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_phi      !< angle between the plane of rotation and the direction of the local wind [size (NumBlNds,numBlades)] [rad]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Re      !< Reynolds number [size (NumBlNds,numBlades)] [-]
-    REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: BN_URelWind_s      !< Relative wind velocity in section coordinates [size (3,NumBlNds,numBlades)] [m/s]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cl_Static      !< Coefficient lift,   excluding unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cd_Static      !< Coefficient drag.   excluding unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cm_Static      !< Coefficient moment, excluding unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cpmin      !< Coefficient minimum pressure, excluding unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cl      !< Coefficient lift,   including unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cd      !< Coefficient drag,   including unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cm      !< Coefficient moment, including unsteady aero effects [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cx      !< normal force coefficient (normal to the plane, not chord) of the jth node in the kth blade [-]
-    REAL(ReKi) , DIMENSION(:), ALLOCATABLE  :: BN_Cy      !< tangential force coefficient (tangential to the plane, not chord) of the jth node in the kth blade [-]
   END TYPE Wng_MiscVarType
 ! =======================
 ! =========  FVW_MiscVarType  =======
@@ -1833,198 +1817,6 @@ subroutine FVW_CopyWng_MiscVarType(SrcWng_MiscVarTypeData, DstWng_MiscVarTypeDat
       end if
       DstWng_MiscVarTypeData%Vind_LL = SrcWng_MiscVarTypeData%Vind_LL
    end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_AxInd)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_AxInd)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_AxInd)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_AxInd)) then
-         allocate(DstWng_MiscVarTypeData%BN_AxInd(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_AxInd.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_AxInd = SrcWng_MiscVarTypeData%BN_AxInd
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_TanInd)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_TanInd)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_TanInd)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_TanInd)) then
-         allocate(DstWng_MiscVarTypeData%BN_TanInd(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_TanInd.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_TanInd = SrcWng_MiscVarTypeData%BN_TanInd
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Vrel)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Vrel)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Vrel)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Vrel)) then
-         allocate(DstWng_MiscVarTypeData%BN_Vrel(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Vrel.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Vrel = SrcWng_MiscVarTypeData%BN_Vrel
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_alpha)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_alpha)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_alpha)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_alpha)) then
-         allocate(DstWng_MiscVarTypeData%BN_alpha(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_alpha.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_alpha = SrcWng_MiscVarTypeData%BN_alpha
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_phi)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_phi)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_phi)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_phi)) then
-         allocate(DstWng_MiscVarTypeData%BN_phi(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_phi.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_phi = SrcWng_MiscVarTypeData%BN_phi
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Re)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Re)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Re)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Re)) then
-         allocate(DstWng_MiscVarTypeData%BN_Re(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Re.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Re = SrcWng_MiscVarTypeData%BN_Re
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_URelWind_s)) then
-      LB(1:2) = lbound(SrcWng_MiscVarTypeData%BN_URelWind_s)
-      UB(1:2) = ubound(SrcWng_MiscVarTypeData%BN_URelWind_s)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_URelWind_s)) then
-         allocate(DstWng_MiscVarTypeData%BN_URelWind_s(LB(1):UB(1),LB(2):UB(2)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_URelWind_s.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_URelWind_s = SrcWng_MiscVarTypeData%BN_URelWind_s
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cl_Static)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cl_Static)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cl_Static)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cl_Static)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cl_Static(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cl_Static.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cl_Static = SrcWng_MiscVarTypeData%BN_Cl_Static
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cd_Static)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cd_Static)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cd_Static)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cd_Static)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cd_Static(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cd_Static.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cd_Static = SrcWng_MiscVarTypeData%BN_Cd_Static
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cm_Static)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cm_Static)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cm_Static)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cm_Static)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cm_Static(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cm_Static.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cm_Static = SrcWng_MiscVarTypeData%BN_Cm_Static
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cpmin)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cpmin)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cpmin)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cpmin)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cpmin(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cpmin.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cpmin = SrcWng_MiscVarTypeData%BN_Cpmin
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cl)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cl)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cl)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cl)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cl(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cl.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cl = SrcWng_MiscVarTypeData%BN_Cl
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cd)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cd)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cd)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cd)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cd(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cd.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cd = SrcWng_MiscVarTypeData%BN_Cd
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cm)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cm)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cm)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cm)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cm(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cm.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cm = SrcWng_MiscVarTypeData%BN_Cm
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cx)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cx)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cx)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cx)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cx(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cx.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cx = SrcWng_MiscVarTypeData%BN_Cx
-   end if
-   if (allocated(SrcWng_MiscVarTypeData%BN_Cy)) then
-      LB(1:1) = lbound(SrcWng_MiscVarTypeData%BN_Cy)
-      UB(1:1) = ubound(SrcWng_MiscVarTypeData%BN_Cy)
-      if (.not. allocated(DstWng_MiscVarTypeData%BN_Cy)) then
-         allocate(DstWng_MiscVarTypeData%BN_Cy(LB(1):UB(1)), stat=ErrStat2)
-         if (ErrStat2 /= 0) then
-            call SetErrStat(ErrID_Fatal, 'Error allocating DstWng_MiscVarTypeData%BN_Cy.', ErrStat, ErrMsg, RoutineName)
-            return
-         end if
-      end if
-      DstWng_MiscVarTypeData%BN_Cy = SrcWng_MiscVarTypeData%BN_Cy
-   end if
 end subroutine
 
 subroutine FVW_DestroyWng_MiscVarType(Wng_MiscVarTypeData, ErrStat, ErrMsg)
@@ -2121,54 +1913,6 @@ subroutine FVW_DestroyWng_MiscVarType(Wng_MiscVarTypeData, ErrStat, ErrMsg)
    if (allocated(Wng_MiscVarTypeData%Vind_LL)) then
       deallocate(Wng_MiscVarTypeData%Vind_LL)
    end if
-   if (allocated(Wng_MiscVarTypeData%BN_AxInd)) then
-      deallocate(Wng_MiscVarTypeData%BN_AxInd)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_TanInd)) then
-      deallocate(Wng_MiscVarTypeData%BN_TanInd)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Vrel)) then
-      deallocate(Wng_MiscVarTypeData%BN_Vrel)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_alpha)) then
-      deallocate(Wng_MiscVarTypeData%BN_alpha)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_phi)) then
-      deallocate(Wng_MiscVarTypeData%BN_phi)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Re)) then
-      deallocate(Wng_MiscVarTypeData%BN_Re)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_URelWind_s)) then
-      deallocate(Wng_MiscVarTypeData%BN_URelWind_s)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cl_Static)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cl_Static)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cd_Static)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cd_Static)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cm_Static)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cm_Static)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cpmin)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cpmin)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cl)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cl)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cd)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cd)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cm)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cm)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cx)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cx)
-   end if
-   if (allocated(Wng_MiscVarTypeData%BN_Cy)) then
-      deallocate(Wng_MiscVarTypeData%BN_Cy)
-   end if
 end subroutine
 
 subroutine FVW_PackWng_MiscVarType(RF, Indata)
@@ -2216,22 +1960,6 @@ subroutine FVW_PackWng_MiscVarType(RF, Indata)
    call UA_PackOutput(RF, InData%y_UA) 
    call UA_PackParam(RF, InData%p_UA) 
    call RegPackAlloc(RF, InData%Vind_LL)
-   call RegPackAlloc(RF, InData%BN_AxInd)
-   call RegPackAlloc(RF, InData%BN_TanInd)
-   call RegPackAlloc(RF, InData%BN_Vrel)
-   call RegPackAlloc(RF, InData%BN_alpha)
-   call RegPackAlloc(RF, InData%BN_phi)
-   call RegPackAlloc(RF, InData%BN_Re)
-   call RegPackAlloc(RF, InData%BN_URelWind_s)
-   call RegPackAlloc(RF, InData%BN_Cl_Static)
-   call RegPackAlloc(RF, InData%BN_Cd_Static)
-   call RegPackAlloc(RF, InData%BN_Cm_Static)
-   call RegPackAlloc(RF, InData%BN_Cpmin)
-   call RegPackAlloc(RF, InData%BN_Cl)
-   call RegPackAlloc(RF, InData%BN_Cd)
-   call RegPackAlloc(RF, InData%BN_Cm)
-   call RegPackAlloc(RF, InData%BN_Cx)
-   call RegPackAlloc(RF, InData%BN_Cy)
    if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
@@ -2286,22 +2014,6 @@ subroutine FVW_UnPackWng_MiscVarType(RF, OutData)
    call UA_UnpackOutput(RF, OutData%y_UA) ! y_UA 
    call UA_UnpackParam(RF, OutData%p_UA) ! p_UA 
    call RegUnpackAlloc(RF, OutData%Vind_LL); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_AxInd); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_TanInd); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Vrel); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_alpha); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_phi); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Re); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_URelWind_s); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cl_Static); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cd_Static); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cm_Static); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cpmin); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cl); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cd); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cm); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cx); if (RegCheckErr(RF, RoutineName)) return
-   call RegUnpackAlloc(RF, OutData%BN_Cy); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
 
 subroutine FVW_CopyMisc(SrcMiscData, DstMiscData, CtrlCode, ErrStat, ErrMsg)

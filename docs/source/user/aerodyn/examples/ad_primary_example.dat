@@ -3,7 +3,7 @@ Description line that will be printed in the output file and written to the scre
 ======  General Options  ============================================================================
 False         Echo               - Echo the input to "<rootname>.AD.ech"?  (flag)
 "default"     DTAero             - Time interval for aerodynamic calculations {or "default"} (s)
-          1   Wake_Mod           - Wake/induction model (switch) {0=none, 1=BEMT, 3=OLAF} [Wake_Mod cannot be 2 or 3 when linearizing]
+          1   Wake_Mod           - Wake/induction model (switch) {0=none, 1=BEMT, 3=OLAF, 4=DMST} [Wake_Mod cannot be 2, 3, or 4 when linearizing]
           1   TwrPotent          - Type tower influence on wind based on potential flow around the tower (switch) {0=none, 1=baseline potential flow, 2=potential flow with Bak correction}
           0   TwrShadow          - Calculate tower influence on wind based on downstream tower shadow (switch) {0=none, 1=Powles model, 2=Eames model}
 False         TwrAero            - Calculate tower aerodynamic loads? (flag)
@@ -43,6 +43,10 @@ False         SectAvg           - Use sector averaging (flag)
          20   tau1_const         - Time constant for DBEMT (s) [used only when DBEMT_Mod=1 or 3]
 ======  OLAF -- cOnvecting LAgrangian Filaments (Free Vortex Wake) Theory Options  ================== [used only when Wake_Mod=3]
 "unused"      OLAFInputFileName  - Input file for OLAF [used only when Wake_Mod=3]
+======  Double Multiple Streamtube Theory Options  ================================================== [used only when WakeMod=4]
+          1   DMSTMod            - Type of momentum theory model (switch) {1=classic, 2=high load} [used only when WakeMod=4]
+          8   Nst                - Number of streamtubes [used only when WakeMod=4]
+"default"     DMSTRes            - Resolution of induction factor initial guess array [used only when WakeMod=4]
 ======  Unsteady Airfoil Aerodynamics Options  ====================================================
 True          AoA34              - Sample the angle of attack (AoA) at the 3/4 chord or the AC point {default=True} [always used]
           3   UA_Mod             - Unsteady Aero Model Switch (switch) {0=Quasi-steady (no UA), 2=B-L Gonzalez, 3=B-L Minnema/Pierce, 4=B-L HGM 4-states, 5=B-L HGM+vortex 5 states, 6=Oye, 7=Boeing-Vertol}

@@ -1,0 +1,100 @@
+###################################################################################################################################
+# Registry for DMST in the FAST Modularization Framework
+# This Registry file is used to create MODULE DMST which contains all of the user-defined types needed in DMST.
+# It also contains copy, destroy, pack, and unpack routines associated with each defined data type.
+# See NWTC Programmer's Handbook for further information on the format/contents of this file.
+#
+# Entries are of the form
+# <Keyword>   <ModuleName/ModName>   <TypeName>   <FieldType>   <FieldName>   <Dims>   <IO>   <DName>   <Descrip>   <Units>
+#
+# Use ^ as a shortcut for the value in the same column from the previous line.
+###################################################################################################################################
+#
+# ..... Include files (definitions from NWTC Library) .............................................................................
+include   Registry_NWTC_Library.txt
+usefrom   AirfoilInfo_Registry.txt
+usefrom   UnsteadyAero_Registry.txt
+#
+# ..... Initialization data .......................................................................................................
+# Define inputs that the initialization routine may need here:
+#
+typedef   DMST/DMST                    InitInputType                 ReKi                     chord                           {:}{:}     -          -          "Chord length at node" m
+typedef   ^                            ^                             INTEGER                  numBlades                       -          -          -          "Number of blades" -
+typedef   ^                            ^                             ReKi                     airDens                         -          -          -          "Air density" kg/m^3
+typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
+typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
+typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
+typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
+typedef   ^                            ^                             LOGICAL                  UA_Flag                         -          -          -          "Logical flag indicating whether to use UnsteadyAero"        -
+typedef   ^                            ^                             UA_InitInputType         UA_Init                         -          -          -          "InitInput data for UA model"
+typedef   ^                            ^                             CHARACTER(1024)          RootName                        -          -          -          "RootName for writing output files" -
+typedef   ^                            ^                             ReKi                     rLocal                          {:}{:}     -          -          "Radial distance to blade node from the center of rotation, measured in the rotor plane, needed for UA" m
+#
+# Define outputs from the initialization routine here:
+#
+typedef   ^                            InitOutputType                ProgDesc                 Version                         -          -          -          "" -
+#
+# ..... States ....................................................................................................................
+# Define continuous (differentiable) states here:
+#
+typedef   ^                            ContinuousStateType           UA_ContinuousStateType   UA                              -          -          -          "UA module continuous states"        -
+#
+# Define discrete (non-differentiable) states here:
+#
+typedef   ^                            DiscreteStateType             UA_DiscreteStateType     UA                              -          -          -          "UA module discrete states"        -
+#
+# Define any other states, including integer or logical states here:
+#
+typedef   ^                            OtherStateType                ReKi                     Vstr                            {:}{:}{:}     -       -          "Stored blade structural velocity, airfoil coordinates" m/s
+typedef   ^                            OtherStateType                ReKi                     M_ag                            {:}{:}{:}{:}  -       -          "Stored blade orientation matrix" -
+typedef   ^                            OtherStateType                ReKi                     blade_theta                     {:}{:}        -       -          "Stored blade azimuth" rad
+typedef   ^                            OtherStateType                ReKi                     indf                            {:}{:}        -       -          "Stored induction factor" -
+typedef   ^                            OtherStateType                UA_OtherStateType        UA                              -             -       -          "Other states for UnsteadyAero"        -
+#
+# ..... Misc/Optimization variables.................................................................................................
+# Define any data that are used only for efficiency purposes (these variables are not associated with time):
+#
+typedef   ^                            MiscVarType                   UA_MiscVarType           UA                              -             -         -        "Misc vars for UnsteadyAero"        -
+typedef   ^                            MiscVarType                   UA_OutputType            y_UA                            -             -         -        "Outputs from UnsteadyAero"        -
+typedef   ^                            MiscVarType                   UA_InputType             u_UA                            {:}{:}{:}     -         -        "Inputs to UnsteadyAero at t and t+dt"        -
+#
+# ..... Parameters ................................................................................................................
+# Define parameters here:
+#
+typedef   ^                            ParameterType                 DbKi                     DT                              -          -          -          "Time step" s
+typedef   ^                            ^                             ReKi                     chord                           {:}{:}     -          -          "Chord length at node" m
+typedef   ^                            ^                             INTEGER                  numBlades                       -          -          -          "Number of blades" -
+typedef   ^                            ^                             ReKi                     airDens                         -          -          -          "Air density" kg/m^3
+typedef   ^                            ^                             ReKi                     kinVisc                         -          -          -          "Kinematic air viscosity" m^2/s
+typedef   ^                            ^                             INTEGER                  numBladeNodes                   -          -          -          "Number of blade nodes used in the analysis" -
+typedef   ^                            ^                             INTEGER                  AFindx                          {:}{:}     -          -          "Index of airfoil data file for blade node location [array of numBladeNodes]" -
+typedef   ^                            ^                             INTEGER                  DMSTMod                         -          -          -          "Type of momentum theory model (switch) {1=classic, 2=high load}" -
+typedef   ^                            ^                             INTEGER                  Nst                             -          -          -          "Number of streamtubes" -
+typedef   ^                            ^                             ReKi                     DMSTRes                         -          -          -          "Resolution of induction factor initial guess array" -
+typedef   ^                            ^                             ReKi                     dTheta                          {:}        -          -          "Total streamtube angle" rad
+typedef   ^                            ^                             ReKi                     theta_st                        {:}        -          -          "Azimuthal position of streamtube midpoint" rad
+typedef   ^                            ^                             ReKi                     indf                            {:}        -          -          "Induction factor initial guess array" -
+typedef   ^                            ^                             ReKi                     CTmo                            {:}        -          -          "Thrust coefficient from linear momentum theory" -
+typedef   ^                            ^                             LOGICAL                  UA_Flag                         -          -          -          "Logical flag indicating whether to use UnsteadyAero"        -
+typedef   ^                            ^                             UA_ParameterType         UA                              -          -          -          "Parameters for UnsteadyAero"        -
+#
+# ..... Inputs ....................................................................................................................
+# Define inputs that are contained on the mesh here:
+#
+typedef   ^                            InputType                     ReKi                     omega                           -          -          -          "Rotor angular velocity" rad/s
+typedef   ^                            InputType                     ReKi                     omega_z                         {:}{:}     -          -          "Blade pitch velocity" rad/s
+typedef   ^                            ^                             ReKi                     Vinf                            {:}{:}{:}  -          -          "Free-stream velocity" m/s
+typedef   ^                            ^                             ReKi                     blade_theta                     {:}{:}     -          -          "Streamtube angle of each blade node in upstream and downstream sweeps" rad
+typedef   ^                            ^                             ReKi                     Vstr                            {:}{:}{:}  -          -          "Blade structural velocity, airfoil coordinates" m/s
+typedef   ^                            ^                             ReKi                     Vstr_g                          {:}{:}{:}     -       -          "Blade structural velocity, global coordinates" m/s
+typedef   ^                            ^                             R8Ki                     M_ag                            {:}{:}{:}{:}  -       -          "Orientation matrix" -
+typedef   ^                            ^                             ReKi                     PitchAndTwist                   {:}{:}     -          -          "Local pitch + twist angle" rad
+typedef   ^                            ^                             INTEGER                  blade_st                        {:}{:}     -          -          "Streamtube corresponding to each blade node" -
+typedef   ^                            ^                             ReKi                     UserProp                        {:}{:}     -          -          "Optional user property for interpolating airfoils (per element per blade)" -
+#
+# ..... Outputs ...................................................................................................................
+# Define outputs that are contained on the mesh here:
+typedef   ^                            OutputType                    ReKi                     Vind                            {:}{:}{:}  -          -          "Global induced velocity" m/s
+typedef   ^                            OutputType                    ReKi                     indf                            {:}{:}     -          -          "Induction factor at each blade node" -

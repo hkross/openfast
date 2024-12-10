@@ -16,6 +16,7 @@ This section contains documentation for the OpenFAST module-coupling environment
    General considerations <general.rst>
    AeroDyn <aerodyn/index.rst>
    OLAF <aerodyn-olaf/index.rst>
+   DMST <aerodyn-dmst/index.rst>
    Aeroacoustics <aerodyn-aeroacoustics/index.rst>
    AeroDisk <aerodisk/index.rst>
    BeamDyn <beamdyn/index.rst>

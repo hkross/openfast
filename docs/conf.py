@@ -71,6 +71,7 @@ extensions = [
 bibtex_bibfiles = [
     'source/user/aerodyn-aeroacoustics/references.bib',
     'source/user/aerodyn-olaf/bibliography.bib',
+    'source/user/aerodyn-dmst/references.bib',
     'source/user/aerodyn/bibliography.bib',
     'source/user/elastodyn/bibliography.bib',
     'source/user/beamdyn/references.bib',

@@ -66,6 +66,10 @@ int main(int argc, char *argv[])
         else if ((arg.compare("-noextrap")) == 0 || (arg.compare("/noextrap")) == 0)
         {
             reg.no_extrap_interp = true;
+            for (auto it = reg.interface_map.begin(); it != reg.interface_map.end(); it++)
+            {
+                it->second->only_reals = false;
+            }
         }
         else if ((arg.compare("-shownodes")) == 0 || (arg.compare("/shownodes")) == 0)
         {
