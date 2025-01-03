@@ -1086,6 +1086,12 @@ class InputReader_OpenFAST(object):
         # Olaf -- cOnvecting LAgrangian Filaments (Free Vortex Wake) Theory Options
         f.readline()
         self.fst_vt['AeroDyn']['OLAFInputFileName']  = quoted_read(f.readline().split()[0])
+
+        # Double Multiple Streamtube Theory Options
+        f.readline()
+        self.fst_vt['AeroDyn']['DMSTMod']  = int(f.readline().split()[0])
+        self.fst_vt['AeroDyn']['Nst']      = int(f.readline().split()[0])
+        self.fst_vt['AeroDyn']['DMSTRes']  = float_read(f.readline().split()[0])
         
         # Unsteady Airfoil Aerodynamics Options
         f.readline()
