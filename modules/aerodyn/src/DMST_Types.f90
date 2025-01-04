@@ -123,7 +123,21 @@ IMPLICIT NONE
     REAL(ReKi) , DIMENSION(:,:), ALLOCATABLE  :: indf      !< Induction factor at each blade node [-]
   END TYPE DMST_OutputType
 ! =======================
-CONTAINS
+   integer(IntKi), public, parameter :: DMST_x_UA_element_x              =   1 ! DMST%UA%element(DL%i1, DL%i2)%x
+   integer(IntKi), public, parameter :: DMST_u_omega                     =   2 ! DMST%omega
+   integer(IntKi), public, parameter :: DMST_u_omega_z                   =   3 ! DMST%omega_z
+   integer(IntKi), public, parameter :: DMST_u_Vinf                      =   4 ! DMST%Vinf
+   integer(IntKi), public, parameter :: DMST_u_blade_theta               =   5 ! DMST%blade_theta
+   integer(IntKi), public, parameter :: DMST_u_Vstr                      =   6 ! DMST%Vstr
+   integer(IntKi), public, parameter :: DMST_u_Vstr_g                    =   7 ! DMST%Vstr_g
+   integer(IntKi), public, parameter :: DMST_u_M_ag                      =   8 ! DMST%M_ag
+   integer(IntKi), public, parameter :: DMST_u_PitchAndTwist             =   9 ! DMST%PitchAndTwist
+   integer(IntKi), public, parameter :: DMST_u_blade_st                  =  10 ! DMST%blade_st
+   integer(IntKi), public, parameter :: DMST_u_UserProp                  =  11 ! DMST%UserProp
+   integer(IntKi), public, parameter :: DMST_y_Vind                      =  12 ! DMST%Vind
+   integer(IntKi), public, parameter :: DMST_y_indf                      =  13 ! DMST%indf
+
+contains
 
 subroutine DMST_CopyInitInput(SrcInitInputData, DstInitInputData, CtrlCode, ErrStat, ErrMsg)
    type(DMST_InitInputType), intent(in) :: SrcInitInputData
@@ -1083,5 +1097,280 @@ subroutine DMST_UnPackOutput(RF, OutData)
    call RegUnpackAlloc(RF, OutData%Vind); if (RegCheckErr(RF, RoutineName)) return
    call RegUnpackAlloc(RF, OutData%indf); if (RegCheckErr(RF, RoutineName)) return
 end subroutine
+
+function DMST_InputMeshPointer(u, DL) result(Mesh)
+   type(DMST_InputType), target, intent(in) :: u
+   type(DatLoc), intent(in)               :: DL
+   type(MeshType), pointer                :: Mesh
+   nullify(Mesh)
+   select case (DL%Num)
+   end select
+end function
+
+function DMST_OutputMeshPointer(y, DL) result(Mesh)
+   type(DMST_OutputType), target, intent(in) :: y
+   type(DatLoc), intent(in)               :: DL
+   type(MeshType), pointer                :: Mesh
+   nullify(Mesh)
+   select case (DL%Num)
+   end select
+end function
+
+subroutine DMST_VarsPackContState(Vars, x, ValAry)
+   type(DMST_ContinuousStateType), intent(in) :: x
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(inout)              :: ValAry(:)
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%x)
+      call DMST_VarPackContState(Vars%x(i), x, ValAry)
+   end do
+end subroutine
+
+subroutine DMST_VarPackContState(V, x, ValAry)
+   type(ModVarType), intent(in)            :: V
+   type(DMST_ContinuousStateType), intent(in) :: x
+   real(R8Ki), intent(inout)               :: ValAry(:)
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_x_UA_element_x)
+         VarVals = x%UA%element(DL%i1, DL%i2)%x(V%iLB:V%iUB)                  ! Rank 1 Array
+      case default
+         VarVals = 0.0_R8Ki
+      end select
+   end associate
+end subroutine
+
+subroutine DMST_VarsUnpackContState(Vars, ValAry, x)
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(in)                 :: ValAry(:)
+   type(DMST_ContinuousStateType), intent(inout) :: x
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%x)
+      call DMST_VarUnpackContState(Vars%x(i), ValAry, x)
+   end do
+end subroutine
+
+subroutine DMST_VarUnpackContState(V, ValAry, x)
+   type(ModVarType), intent(in)            :: V
+   real(R8Ki), intent(in)                  :: ValAry(:)
+   type(DMST_ContinuousStateType), intent(inout) :: x
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_x_UA_element_x)
+         x%UA%element(DL%i1, DL%i2)%x(V%iLB:V%iUB) = VarVals                  ! Rank 1 Array
+      end select
+   end associate
+end subroutine
+
+function DMST_ContinuousStateFieldName(DL) result(Name)
+   type(DatLoc), intent(in)      :: DL
+   character(32)                 :: Name
+   select case (DL%Num)
+   case (DMST_x_UA_element_x)
+       Name = "x%UA%element("//trim(Num2LStr(DL%i1))//", "//trim(Num2LStr(DL%i2))//")%x"
+   case default
+       Name = "Unknown Field"
+   end select
+end function
+
+subroutine DMST_VarsPackContStateDeriv(Vars, x, ValAry)
+   type(DMST_ContinuousStateType), intent(in) :: x
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(inout)              :: ValAry(:)
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%x)
+      call DMST_VarPackContStateDeriv(Vars%x(i), x, ValAry)
+   end do
+end subroutine
+
+subroutine DMST_VarPackContStateDeriv(V, x, ValAry)
+   type(ModVarType), intent(in)            :: V
+   type(DMST_ContinuousStateType), intent(in) :: x
+   real(R8Ki), intent(inout)               :: ValAry(:)
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_x_UA_element_x)
+         VarVals = x%UA%element(DL%i1, DL%i2)%x(V%iLB:V%iUB)                  ! Rank 1 Array
+      case default
+         VarVals = 0.0_R8Ki
+      end select
+   end associate
+end subroutine
+
+subroutine DMST_VarsPackInput(Vars, u, ValAry)
+   type(DMST_InputType), intent(in)        :: u
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(inout)              :: ValAry(:)
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%u)
+      call DMST_VarPackInput(Vars%u(i), u, ValAry)
+   end do
+end subroutine
+
+subroutine DMST_VarPackInput(V, u, ValAry)
+   type(ModVarType), intent(in)            :: V
+   type(DMST_InputType), intent(in)        :: u
+   real(R8Ki), intent(inout)               :: ValAry(:)
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_u_omega)
+         VarVals(1) = u%omega                                                 ! Scalar
+      case (DMST_u_omega_z)
+         VarVals = u%omega_z(V%iLB:V%iUB,V%j)                                 ! Rank 2 Array
+      case (DMST_u_Vinf)
+         VarVals = u%Vinf(V%iLB:V%iUB, V%j, V%k)                              ! Rank 3 Array
+      case (DMST_u_blade_theta)
+         VarVals = u%blade_theta(V%iLB:V%iUB,V%j)                             ! Rank 2 Array
+      case (DMST_u_Vstr)
+         VarVals = u%Vstr(V%iLB:V%iUB, V%j, V%k)                              ! Rank 3 Array
+      case (DMST_u_Vstr_g)
+         VarVals = u%Vstr_g(V%iLB:V%iUB, V%j, V%k)                            ! Rank 3 Array
+      case (DMST_u_M_ag)
+         VarVals = u%M_ag(V%iLB:V%iUB, V%j, V%k, V%m)                         ! Rank 4 Array
+      case (DMST_u_PitchAndTwist)
+         VarVals = u%PitchAndTwist(V%iLB:V%iUB,V%j)                           ! Rank 2 Array
+      case (DMST_u_blade_st)
+         VarVals = u%blade_st(V%iLB:V%iUB,V%j)                                ! Rank 2 Array
+      case (DMST_u_UserProp)
+         VarVals = u%UserProp(V%iLB:V%iUB,V%j)                                ! Rank 2 Array
+      case default
+         VarVals = 0.0_R8Ki
+      end select
+   end associate
+end subroutine
+
+subroutine DMST_VarsUnpackInput(Vars, ValAry, u)
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(in)                 :: ValAry(:)
+   type(DMST_InputType), intent(inout)     :: u
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%u)
+      call DMST_VarUnpackInput(Vars%u(i), ValAry, u)
+   end do
+end subroutine
+
+subroutine DMST_VarUnpackInput(V, ValAry, u)
+   type(ModVarType), intent(in)            :: V
+   real(R8Ki), intent(in)                  :: ValAry(:)
+   type(DMST_InputType), intent(inout)     :: u
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_u_omega)
+         u%omega = VarVals(1)                                                 ! Scalar
+      case (DMST_u_omega_z)
+         u%omega_z(V%iLB:V%iUB, V%j) = VarVals                                ! Rank 2 Array
+      case (DMST_u_Vinf)
+         u%Vinf(V%iLB:V%iUB, V%j, V%k) = VarVals                              ! Rank 3 Array
+      case (DMST_u_blade_theta)
+         u%blade_theta(V%iLB:V%iUB, V%j) = VarVals                            ! Rank 2 Array
+      case (DMST_u_Vstr)
+         u%Vstr(V%iLB:V%iUB, V%j, V%k) = VarVals                              ! Rank 3 Array
+      case (DMST_u_Vstr_g)
+         u%Vstr_g(V%iLB:V%iUB, V%j, V%k) = VarVals                            ! Rank 3 Array
+      case (DMST_u_M_ag)
+         u%M_ag(V%iLB:V%iUB, V%j, V%k, V%m) = VarVals                         ! Rank 4 Array
+      case (DMST_u_PitchAndTwist)
+         u%PitchAndTwist(V%iLB:V%iUB, V%j) = VarVals                          ! Rank 2 Array
+      case (DMST_u_blade_st)
+         u%blade_st(V%iLB:V%iUB, V%j) = VarVals                               ! Rank 2 Array
+      case (DMST_u_UserProp)
+         u%UserProp(V%iLB:V%iUB, V%j) = VarVals                               ! Rank 2 Array
+      end select
+   end associate
+end subroutine
+
+function DMST_InputFieldName(DL) result(Name)
+   type(DatLoc), intent(in)      :: DL
+   character(32)                 :: Name
+   select case (DL%Num)
+   case (DMST_u_omega)
+       Name = "u%omega"
+   case (DMST_u_omega_z)
+       Name = "u%omega_z"
+   case (DMST_u_Vinf)
+       Name = "u%Vinf"
+   case (DMST_u_blade_theta)
+       Name = "u%blade_theta"
+   case (DMST_u_Vstr)
+       Name = "u%Vstr"
+   case (DMST_u_Vstr_g)
+       Name = "u%Vstr_g"
+   case (DMST_u_M_ag)
+       Name = "u%M_ag"
+   case (DMST_u_PitchAndTwist)
+       Name = "u%PitchAndTwist"
+   case (DMST_u_blade_st)
+       Name = "u%blade_st"
+   case (DMST_u_UserProp)
+       Name = "u%UserProp"
+   case default
+       Name = "Unknown Field"
+   end select
+end function
+
+subroutine DMST_VarsPackOutput(Vars, y, ValAry)
+   type(DMST_OutputType), intent(in)       :: y
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(inout)              :: ValAry(:)
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%y)
+      call DMST_VarPackOutput(Vars%y(i), y, ValAry)
+   end do
+end subroutine
+
+subroutine DMST_VarPackOutput(V, y, ValAry)
+   type(ModVarType), intent(in)            :: V
+   type(DMST_OutputType), intent(in)       :: y
+   real(R8Ki), intent(inout)               :: ValAry(:)
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_y_Vind)
+         VarVals = y%Vind(V%iLB:V%iUB, V%j, V%k)                              ! Rank 3 Array
+      case (DMST_y_indf)
+         VarVals = y%indf(V%iLB:V%iUB,V%j)                                    ! Rank 2 Array
+      case default
+         VarVals = 0.0_R8Ki
+      end select
+   end associate
+end subroutine
+
+subroutine DMST_VarsUnpackOutput(Vars, ValAry, y)
+   type(ModVarsType), intent(in)          :: Vars
+   real(R8Ki), intent(in)                 :: ValAry(:)
+   type(DMST_OutputType), intent(inout)    :: y
+   integer(IntKi)                         :: i
+   do i = 1, size(Vars%y)
+      call DMST_VarUnpackOutput(Vars%y(i), ValAry, y)
+   end do
+end subroutine
+
+subroutine DMST_VarUnpackOutput(V, ValAry, y)
+   type(ModVarType), intent(in)            :: V
+   real(R8Ki), intent(in)                  :: ValAry(:)
+   type(DMST_OutputType), intent(inout)    :: y
+   associate (DL => V%DL, VarVals => ValAry(V%iLoc(1):V%iLoc(2)))
+      select case (DL%Num)
+      case (DMST_y_Vind)
+         y%Vind(V%iLB:V%iUB, V%j, V%k) = VarVals                              ! Rank 3 Array
+      case (DMST_y_indf)
+         y%indf(V%iLB:V%iUB, V%j) = VarVals                                   ! Rank 2 Array
+      end select
+   end associate
+end subroutine
+
+function DMST_OutputFieldName(DL) result(Name)
+   type(DatLoc), intent(in)      :: DL
+   character(32)                 :: Name
+   select case (DL%Num)
+   case (DMST_y_Vind)
+       Name = "y%Vind"
+   case (DMST_y_indf)
+       Name = "y%indf"
+   case default
+       Name = "Unknown Field"
+   end select
+end function
+
 END MODULE DMST_Types
+
 !ENDOFREGISTRYGENERATEDFILE
